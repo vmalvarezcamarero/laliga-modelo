@@ -122,7 +122,14 @@ def _neg_log_verosimilitud(
         - lambda_visit
     )
 
-    return -float(np.sum(pesos * ll))
+    # Penalizacion minuscula sobre los parametros en bruto.
+    # Centrar dentro de la funcion crea direcciones planas (sumar una
+    # constante a todos los ataques no cambia nada), y el optimizador
+    # se pasea por ellas sin converger. Este termino las elimina sin
+    # mover la solucion de forma apreciable.
+    penalizacion = 1e-4 * float(np.sum(params**2))
+
+    return -float(np.sum(pesos * ll)) + penalizacion
 
 
 # --- Etapa 2: rho sobre goles reales --------------------------------
@@ -191,7 +198,7 @@ def ajustar(
         inicial,
         args=(idx_local, idx_visit, xg_local, xg_visit, pesos, n),
         method="L-BFGS-B",
-        options={"maxiter": 2000},
+        options={"maxiter": 5000, "maxfun": 50000},,
     )
 
     if not resultado.success:
