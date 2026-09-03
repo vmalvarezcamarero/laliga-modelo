@@ -5,3 +5,5 @@ __pycache__/
 data/raw/
 outputs/charts/
 .DS_Store
+
+criba_*.txt

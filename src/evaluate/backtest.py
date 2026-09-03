@@ -221,7 +221,7 @@ def main() -> None:
     parser.add_argument(
         "--xi",
         type=float,
-        default=0.0018,
+        default=0.001,
         help="decaimiento temporal (0 = todos los partidos pesan igual)",
     )
     parser.add_argument(
