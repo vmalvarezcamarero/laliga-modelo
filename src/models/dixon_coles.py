@@ -198,7 +198,7 @@ def ajustar(
         inicial,
         args=(idx_local, idx_visit, xg_local, xg_visit, pesos, n),
         method="L-BFGS-B",
-        options={"maxiter": 5000, "maxfun": 50000},,
+        options={"maxiter": 5000, "maxfun": 50000},
     )
 
     if not resultado.success:
