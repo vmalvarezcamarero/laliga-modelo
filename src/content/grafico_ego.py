@@ -160,7 +160,7 @@ def dibujar(
 
     # El punto suelto de cada jornada: el acumulado cuenta la temporada,
     # el punto hace visible la semana del batacazo.
-    ax.scatter(x, df["rps_ego"], s=24, color=estilo.APAGADO, zorder=2)
+    ax.scatter(x, df["rps_ego"], s=24, color=estilo.SECUNDARIO, zorder=2)
 
     ax.plot(
         x, df["rps_tonto_acum"], color=estilo.SECUNDARIO,
@@ -193,13 +193,7 @@ def dibujar(
     ax.grid(axis="y", linewidth=1)
     ax.set_axisbelow(True)
 
-    # "Hacia abajo es mejor" es antiintuitivo para cualquiera. No se
-    # invierte el eje: se avisa.
-    ax.annotate(
-        "mejor",
-        xy=(0.012, 0.05), xycoords="axes fraction",
-        fontsize=13, color=estilo.SECUNDARIO, rotation=90,
-    )
+  
 
     estilo.titular(fig, "EGO PASA LA CRIBA", subtitulo)
     estilo.pie(
