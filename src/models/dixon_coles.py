@@ -20,9 +20,16 @@ Dos particularidades respecto a la implementacion de manual:
 
 Ataque y defensa estan centrados: 1.00 es exactamente la media de la
 liga. El nivel absoluto de goles vive en su propio parametro.
+
+3. Encogimiento hacia la media (D-27, resuelve P-10). Un equipo con
+   pocos partidos en la ventana recibe estimaciones extremas: el Oviedo
+   con 3 partidos salio con fuerza 0.47. Ataque y defensa se mezclan con
+   el 1.00 de la liga en proporcion a la muestra. Se aplica UNA vez, al
+   construir ParametrosDC, para que prediccion, tabla, criba y graficos
+   hablen con los mismos numeros.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
@@ -31,10 +38,16 @@ from scipy.stats import poisson
 
 MAX_GOLES = 8  # matriz de marcadores de 0-0 a 8-8
 
+# Partidos necesarios para creerse la mitad de lo que dice el modelo.
+# 10 es el mismo umbral que ya usaba grafico_criba.py para considerar
+# que un equipo tiene muestra: se reutiliza en vez de anadir un numero
+# nuevo al proyecto.
+K_ENCOGIMIENTO = 10
+
 
 @dataclass
 class ParametrosDC:
-    """Resultado de un ajuste."""
+    """Resultado de un ajuste. Los parametros ya vienen encogidos."""
 
     equipos: list[str]
     ataque: np.ndarray      # uno por equipo, 1.00 = media
@@ -42,10 +55,14 @@ class ParametrosDC:
     ventaja_campo: float
     nivel_liga: float       # xG medio de referencia de la liga
     rho: float
-    n_partidos: int
+    n_partidos: int                       # total del ajuste
+    partidos_equipo: dict[str, int] = field(default_factory=dict)
 
     def indice(self, equipo: str) -> int:
         return self.equipos.index(equipo)
+
+    def muestra(self, equipo: str) -> int:
+        return self.partidos_equipo.get(equipo, 0)
 
     def tabla(self) -> pd.DataFrame:
         """Fuerzas por equipo, ordenadas por fuerza neta."""
@@ -56,10 +73,39 @@ class ParametrosDC:
                 "defensa": self.defensa,
             }
         )
+        df["partidos"] = df["equipo"].map(self.partidos_equipo).fillna(0).astype(int)
         # Fuerza neta: cuanto genera dividido entre cuanto concede.
         # 1.00 es un equipo exactamente medio.
         df["fuerza"] = df["ataque"] / df["defensa"]
         return df.sort_values("fuerza", ascending=False).reset_index(drop=True)
+
+
+# --- Encogimiento hacia la media ------------------------------------
+
+
+def peso_muestra(n: int, k: int = K_ENCOGIMIENTO) -> float:
+    """
+    Cuanto nos creemos la estimacion propia de un equipo.
+
+    w = n / (n + k).  Con k = 10:
+      3 partidos  -> 23%
+     10 partidos  -> 50%
+     38 partidos  -> 79%
+    """
+    return n / (n + k)
+
+
+def encoger(valores: np.ndarray, muestras: np.ndarray, k: int = K_ENCOGIMIENTO) -> np.ndarray:
+    """
+    Mezcla cada valor con el 1.00 de la liga segun su muestra.
+
+    Se aplica a ataque y defensa POR SEPARADO, nunca a la fuerza neta:
+    encoger la division dejaria pasar equipos con fuerza razonable
+    compuesta de ataque y defensa absurdos, y son esos dos numeros los
+    que alimentan la prediccion de cada partido.
+    """
+    w = muestras / (muestras + k)
+    return w * valores + (1 - w) * 1.0
 
 
 # --- Pesos temporales ----------------------------------------------
@@ -161,14 +207,18 @@ def _neg_ll_rho(rho_array, goles_local, goles_visit, lambda_local, lambda_visit,
 
 def ajustar(
     partidos: pd.DataFrame,
-    xi: float = 0.0018,
+    xi: float = 0.001,
     referencia=None,
+    k: int = K_ENCOGIMIENTO,
 ) -> ParametrosDC:
     """
     Ajusta el modelo sobre un DataFrame de partidos.
 
     Columnas necesarias: fecha, local, visitante, xg_local, xg_visitante,
     goles_local, goles_visitante.
+
+    Los parametros devueltos ya vienen encogidos hacia la media (D-27).
+    Con k = 0 se desactiva el encogimiento, util para comparar.
     """
     partidos = partidos.dropna(
         subset=["xg_local", "xg_visitante", "goles_local", "goles_visitante"]
@@ -189,6 +239,14 @@ def ajustar(
     xg_local = partidos["xg_local"].to_numpy(dtype=float)
     xg_visit = partidos["xg_visitante"].to_numpy(dtype=float)
     pesos = pesos_temporales(partidos["fecha"], referencia, xi)
+
+    # Partidos por equipo. Es lo que gobierna el encogimiento.
+    conteo = (
+        pd.concat([partidos["local"], partidos["visitante"]])
+        .value_counts()
+        .to_dict()
+    )
+    partidos_equipo = {e: int(conteo.get(e, 0)) for e in equipos}
 
     # Punto de partida: todos los equipos iguales, ventaja de campo leve
     inicial = np.concatenate([np.zeros(n), np.zeros(n), [np.log(1.15), np.log(1.3)]])
@@ -211,7 +269,9 @@ def ajustar(
     log_gamma = resultado.x[-2]
     mu = resultado.x[-1]
 
-    # Etapa 2: rho sobre los goles reales
+    # Etapa 2: rho sobre los goles reales.
+    # Se calcula con los parametros SIN encoger: rho describe la
+    # dependencia entre marcadores bajos, no la fuerza de nadie.
     lambda_local = np.exp(mu + log_ataque[idx_local] + log_defensa[idx_visit] + log_gamma)
     lambda_visit = np.exp(mu + log_ataque[idx_visit] + log_defensa[idx_local])
 
@@ -229,14 +289,24 @@ def ajustar(
         bounds=[(-0.3, 0.3)],
     )
 
+    # Encogimiento (D-27). Una sola vez, aqui, para que todo lo que
+    # salga de este objeto hable con los mismos numeros.
+    ataque = np.exp(log_ataque)
+    defensa = np.exp(log_defensa)
+    if k > 0:
+        muestras = np.array([partidos_equipo[e] for e in equipos], dtype=float)
+        ataque = encoger(ataque, muestras, k)
+        defensa = encoger(defensa, muestras, k)
+
     return ParametrosDC(
         equipos=equipos,
-        ataque=np.exp(log_ataque),
-        defensa=np.exp(log_defensa),
+        ataque=ataque,
+        defensa=defensa,
         ventaja_campo=float(np.exp(log_gamma)),
         nivel_liga=float(np.exp(mu)),
         rho=float(res_rho.x[0]),
         n_partidos=len(partidos),
+        partidos_equipo=partidos_equipo,
     )
 
 
