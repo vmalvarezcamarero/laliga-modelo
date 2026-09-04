@@ -53,6 +53,10 @@ VERSION_ESQUEMA = 1
 # merecen. La exclusion visual resuelve eso (D-25).
 MIN_PARTIDOS_CRIBA = 10
 
+# Frecuencias base de LaLiga. Sirven de referencia para medir cuanto se
+# aleja EGO de lo que diria cualquiera, cuando no hay choque directo.
+BASE_LIGA = (0.45, 0.25, 0.30)
+
 
 # --- Datos ----------------------------------------------------------
 
@@ -79,18 +83,24 @@ def _equipos_de_la_temporada(temporada: str) -> set[str]:
     return {f[0] for f in filas}
 
 
-def _criba_anterior() -> set[str]:
-    """Quien pasaba la criba en el JSON anterior. Vacio si no hay."""
+def _criba_anterior() -> set[str] | None:
+    """
+    Quien pasaba la criba la semana pasada.
+
+    Devuelve None si no hay JSON anterior: sin referencia no se puede
+    decir que nadie "entra" ni "cae". Un set vacio significaria que la
+    semana pasada no paso nadie, que es otra cosa.
+    """
     if not SALIDA.exists():
-        return set()
+        return None
     previos = sorted(SALIDA.glob("*_prediccion.json"))
     if not previos:
-        return set()
+        return None
     try:
         datos = json.loads(previos[-1].read_text(encoding="utf-8"))
         return {e["equipo"] for e in datos["criba"]["pasan"]}
     except (json.JSONDecodeError, KeyError):
-        return set()
+        return None
 
 
 # --- Criba ----------------------------------------------------------
@@ -99,6 +109,7 @@ def _criba_anterior() -> set[str]:
 def _construir_criba(tabla: pd.DataFrame, de_la_liga: set[str]) -> dict:
     tabla = tabla[tabla["equipo"].isin(de_la_liga)].copy()
     antes = _criba_anterior()
+    primera = antes is None
 
     pasan, no_pasan, sin_datos = [], [], []
 
@@ -115,12 +126,18 @@ def _construir_criba(tabla: pd.DataFrame, de_la_liga: set[str]) -> dict:
         fuerza = round(float(fila["fuerza"]), 2)
         distancia = round(fuerza - UMBRAL, 2)
         dentro = fuerza >= UMBRAL
-        estaba = publicable in antes
 
-        if dentro:
-            estado = "sigue_dentro" if estaba else "entra"
+        if primera:
+            # Sin criba anterior no hay movimiento que narrar. Decir
+            # "entra" haria que el redactor escribiese que el Barcelona
+            # acaba de entrar en la criba.
+            estado = "sin_referencia"
         else:
-            estado = "cae" if estaba else "sigue_fuera"
+            estaba = publicable in antes
+            if dentro:
+                estado = "sigue_dentro" if estaba else "entra"
+            else:
+                estado = "cae" if estaba else "sigue_fuera"
 
         registro = {
             "equipo": publicable,
@@ -140,7 +157,7 @@ def _construir_criba(tabla: pd.DataFrame, de_la_liga: set[str]) -> dict:
             "n_pasan": len(pasan),
             "entran": [e["equipo"] for e in pasan if e["estado"] == "entra"],
             "salen": [e["equipo"] for e in no_pasan if e["estado"] == "cae"],
-            "primera_criba": not antes,
+            "primera_criba": primera,
         },
     }
 
@@ -192,6 +209,9 @@ def _construir_partidos(
         matriz = matriz_marcadores(dc, p.local, p.visitante)
         pl, pe, pv = probabilidades_1x2(matriz)
 
+        loc_dentro = loc_pub in dentro
+        vis_dentro = vis_pub in dentro
+
         registro = {
             "id": f"J{p.jornada}_{p.local}_{p.visitante}".replace(" ", ""),
             "jornada": p.jornada,
@@ -208,9 +228,9 @@ def _construir_partidos(
             "mas_25_goles": round(_prob_mas_de_25(matriz) * 100),
             "ambos_marcan": round(_prob_ambos_marcan(matriz) * 100),
             "criba": {
-                "local": loc_pub in dentro,
-                "visitante": vis_pub in dentro,
-                "choque_directo": (loc_pub in dentro) != (vis_pub in dentro),
+                "local": loc_dentro,
+                "visitante": vis_dentro,
+                "choque_directo": loc_dentro != vis_dentro,
             },
             "fiabilidad": (
                 "parcial"
@@ -221,17 +241,11 @@ def _construir_partidos(
 
         if _conoce(corn, p.local) and _conoce(corn, p.visitante):
             cl, cv = corners.corners_esperados(corn, p.local, p.visitante)
-            registro["corners"] = {
-                "local": round(cl, 1),
-                "visitante": round(cv, 1),
-            }
+            registro["corners"] = {"local": round(cl, 1), "visitante": round(cv, 1)}
 
         if _conoce(tarj, p.local) and _conoce(tarj, p.visitante):
             tl, tv = cards.tarjetas_esperadas(tarj, p.local, p.visitante)
-            registro["tarjetas"] = {
-                "local": round(tl, 1),
-                "visitante": round(tv, 1),
-            }
+            registro["tarjetas"] = {"local": round(tl, 1), "visitante": round(tv, 1)}
 
         partidos.append(registro)
 
@@ -239,6 +253,63 @@ def _construir_partidos(
 
 
 # --- Ganchos --------------------------------------------------------
+
+
+def _distancia_a_la_liga(p: dict) -> float:
+    """Cuanto se aleja EGO del 45/25/30 de LaLiga, en puntos."""
+    return (
+        abs(p["prob"]["local"] - BASE_LIGA[0] * 100)
+        + abs(p["prob"]["empate"] - BASE_LIGA[1] * 100)
+        + abs(p["prob"]["visitante"] - BASE_LIGA[2] * 100)
+    )
+
+
+def _atrevida(partidos: list[dict]) -> dict | None:
+    """
+    La prediccion mas atrevida: el equipo que NO pasa la criba con mas
+    probabilidad de ganar a uno que SI la pasa.
+
+    Es el choque directo, que es el conflicto que define la cuenta: la
+    criba dice una cosa y la prediccion del partido dice otra. Que gane
+    el visitante no es atrevido por si mismo (el Barcelona en Mestalla
+    es lo que diria cualquiera); lo atrevido es que EGO le de opciones a
+    quien acaba de descartar.
+
+    Si ninguna jornada enfrenta a dentro contra fuera, cae al segundo
+    criterio: el partido donde EGO mas se aleja de las frecuencias base.
+    """
+    candidatos = []
+    for p in partidos:
+        if not p["criba"]["choque_directo"]:
+            continue
+        if p["criba"]["local"]:
+            # El que no pasa es el visitante.
+            candidatos.append((p, p["prob"]["visitante"], p["visitante"]))
+        else:
+            candidatos.append((p, p["prob"]["local"], p["local"]))
+
+    if candidatos:
+        elegido, cifra, equipo = max(candidatos, key=lambda c: c[1])
+        return {
+            "partido": elegido["id"],
+            "equipo": equipo,
+            "cifra": cifra,
+            "motivo": "descartado_con_opciones",
+        }
+
+    if not partidos:
+        return None
+
+    elegido = max(partidos, key=_distancia_a_la_liga)
+    favorito = max(
+        ("local", "empate", "visitante"), key=lambda k: elegido["prob"][k]
+    )
+    return {
+        "partido": elegido["id"],
+        "equipo": elegido.get(favorito, "empate"),
+        "cifra": elegido["prob"][favorito],
+        "motivo": "lejos_de_la_media_de_la_liga",
+    }
 
 
 def _ganchos(partidos: list[dict], criba: dict) -> dict:
@@ -250,8 +321,8 @@ def _ganchos(partidos: list[dict], criba: dict) -> dict:
         "F4_encuesta": None,
     }
 
-    # F1: el equipo mas cerca del corte por debajo. Si alguno cae esta
-    # semana, ese manda: es el titular.
+    # F1: si alguien cae esta semana, ese es el titular. Si no, el que
+    # se ha quedado mas cerca del corte.
     caen = [e for e in criba["no_pasan"] if e["estado"] == "cae"]
     candidatos = caen or criba["no_pasan"]
     if candidatos:
@@ -262,34 +333,19 @@ def _ganchos(partidos: list[dict], criba: dict) -> dict:
             "motivo": "cae_esta_semana" if caen else "mas_cerca_del_corte",
         }
 
-    # F2: la prediccion mas atrevida. Un visitante favorito es lo mas
-    # contrario a la intuicion; si no hay, el mayor favoritismo local.
-    visitantes = [p for p in partidos if p["prob"]["visitante"] > p["prob"]["local"]]
-    if visitantes:
-        elegido = max(visitantes, key=lambda p: p["prob"]["visitante"])
-        g["F2_atrevida"] = {
-            "partido": elegido["id"],
-            "cifra": elegido["prob"]["visitante"],
-            "motivo": "visitante_favorito",
-        }
-    elif partidos:
-        elegido = max(partidos, key=lambda p: p["prob"]["local"])
-        g["F2_atrevida"] = {
-            "partido": elegido["id"],
-            "cifra": elegido["prob"]["local"],
-            "motivo": "favorito_mas_claro",
-        }
+    g["F2_atrevida"] = _atrevida(partidos)
 
     # F3: maxima entropia. Donde EGO admite que no sabe.
     if partidos:
         abierto = max(partidos, key=lambda p: p["entropia"])
-        g["F3_punto_ciego"] = {
-            "partido": abierto["id"],
-            "cifra": abierto["entropia"],
-        }
+        g["F3_punto_ciego"] = {"partido": abierto["id"], "cifra": abierto["entropia"]}
+
         # F4: la encuesta va al segundo mas abierto, para no repetir el
         # mismo partido en dos formatos de la misma semana.
-        resto = [p for p in partidos if p["id"] != abierto["id"]]
+        ocupados = {abierto["id"]}
+        if g["F2_atrevida"]:
+            ocupados.add(g["F2_atrevida"]["partido"])
+        resto = [p for p in partidos if p["id"] not in ocupados]
         if resto:
             segundo = max(resto, key=lambda p: p["entropia"])
             g["F4_encuesta"] = {"partido": segundo["id"]}
@@ -336,10 +392,7 @@ def generar(referencia: datetime | None = None, escribir: bool = True) -> dict:
             "desde": semana.desde.isoformat(),
             "hasta": semana.hasta.isoformat(),
         },
-        "entrenamiento": {
-            "hasta": str(corte),
-            "partidos": len(entrenamiento),
-        },
+        "entrenamiento": {"hasta": str(corte), "partidos": len(entrenamiento)},
         "criba": criba,
         "partidos": partidos,
         "ganchos": _ganchos(partidos, criba),
@@ -372,9 +425,9 @@ if __name__ == "__main__":
     print(f"\nPARTIDOS ({len(d['partidos'])})")
     for p in d["partidos"]:
         pr = p["prob"]
-        print(f"   {p['local']:<14} {pr['local']:>3}  {pr['empate']:>3}  "
-              f"{pr['visitante']:>3}  {p['visitante']:<14} "
-              f"H={p['entropia']:.2f}")
+        marca = " *" if p["criba"]["choque_directo"] else "  "
+        print(f"  {marca} {p['local']:<14} {pr['local']:>3}  {pr['empate']:>3}  "
+              f"{pr['visitante']:>3}  {p['visitante']:<14} H={p['entropia']:.2f}")
 
     print("\nGANCHOS")
     for k, v in d["ganchos"].items():
