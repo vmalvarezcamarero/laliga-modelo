@@ -23,6 +23,11 @@ que se rompera solo va contra el techo de 15 minutos semanales
 (00_PROYECTO.md §9). Si algun dia las tarjetas dan juego de verdad, se
 anade entonces con datos sobre la mesa.
 
+Nota (D-24): football-data.org SI trae arbitro en el calendario, y se
+guarda en `fixtures` sin usarlo. Viene incompleto (14 de 30 partidos en
+la primera prueba), asi que la decision se mantiene hasta tener dos
+temporadas acumuladas.
+
 Solo amarillas
 --------------
 Las rojas van a 0.241 por partido: una cada cuatro. Estimar una tasa por
@@ -37,13 +42,19 @@ La segunda es la interesante: un equipo que provoca faltas juega
 distinto de uno que las comete. Da contenido aunque el modelo prediga
 regular.
 
+Encogimiento hacia la media (D-27)
+----------------------------------
+Igual que en los otros dos modelos, y con la misma funcion. Un equipo
+con pocos partidos recibe estimaciones extremas que se multiplican al
+cruzarse con las del rival.
+
 Nota sobre la ventaja de campo
 ------------------------------
 Aqui se invierte respecto a xG y corners: el local suele recibir MENOS
 tarjetas. Si el parametro sale por debajo de 1.00, no es un error.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
@@ -51,14 +62,14 @@ from scipy.optimize import minimize
 from scipy.stats import poisson
 
 from src.models.criba import XI
-from src.models.dixon_coles import pesos_temporales
+from src.models.dixon_coles import K_ENCOGIMIENTO, encoger, pesos_temporales
 
 MAX_TARJETAS = 15
 
 
 @dataclass
 class ParametrosTarjetas:
-    """Resultado de un ajuste."""
+    """Resultado de un ajuste. Los parametros ya vienen encogidos."""
 
     equipos: list[str]
     propension: np.ndarray    # 1.00 = recibe las de un equipo medio
@@ -67,9 +78,13 @@ class ParametrosTarjetas:
     nivel_liga: float         # amarillas de referencia por equipo y partido
     tasa_rojas: float         # rojas por partido en toda la liga
     n_partidos: int
+    partidos_equipo: dict[str, int] = field(default_factory=dict)
 
     def indice(self, equipo: str) -> int:
         return self.equipos.index(equipo)
+
+    def muestra(self, equipo: str) -> int:
+        return self.partidos_equipo.get(equipo, 0)
 
     def tabla(self) -> pd.DataFrame:
         """Propension y provocacion por equipo, de mas a menos tarjetero."""
@@ -80,6 +95,7 @@ class ParametrosTarjetas:
                 "provocacion": self.provocacion,
             }
         )
+        df["partidos"] = df["equipo"].map(self.partidos_equipo).fillna(0).astype(int)
         return df.sort_values("propension", ascending=False).reset_index(drop=True)
 
 
@@ -137,11 +153,15 @@ def ajustar(
     partidos: pd.DataFrame,
     xi: float = XI,
     referencia=None,
+    k: int = K_ENCOGIMIENTO,
 ) -> ParametrosTarjetas:
     """
     Columnas necesarias: fecha, local, visitante, amarillas_local,
     amarillas_visitante. Usa rojas_local y rojas_visitante si estan,
     solo para la tasa global.
+
+    Los parametros devueltos ya vienen encogidos hacia la media (D-27).
+    Con k = 0 se desactiva el encogimiento, util para comparar.
     """
     partidos = partidos.dropna(
         subset=["amarillas_local", "amarillas_visitante"]
@@ -162,6 +182,14 @@ def ajustar(
     t_local = partidos["amarillas_local"].to_numpy(dtype=float)
     t_visit = partidos["amarillas_visitante"].to_numpy(dtype=float)
     pesos = pesos_temporales(partidos["fecha"], referencia, xi)
+
+    # Partidos por equipo. Es lo que gobierna el encogimiento.
+    conteo = (
+        pd.concat([partidos["local"], partidos["visitante"]])
+        .value_counts()
+        .to_dict()
+    )
+    partidos_equipo = {e: int(conteo.get(e, 0)) for e in equipos}
 
     media = float(np.mean(np.concatenate([t_local, t_visit])))
     # Factor local por debajo de 1: el local suele recibir menos.
@@ -190,14 +218,24 @@ def ajustar(
     else:
         tasa_rojas = float("nan")
 
+    propension = np.exp(log_propension)
+    provocacion = np.exp(log_provocacion)
+
+    # Encogimiento (D-27). Una sola vez, aqui.
+    if k > 0:
+        muestras = np.array([partidos_equipo[e] for e in equipos], dtype=float)
+        propension = encoger(propension, muestras, k)
+        provocacion = encoger(provocacion, muestras, k)
+
     return ParametrosTarjetas(
         equipos=equipos,
-        propension=np.exp(log_propension),
-        provocacion=np.exp(log_provocacion),
+        propension=propension,
+        provocacion=provocacion,
         factor_local=float(np.exp(resultado.x[-2])),
         nivel_liga=float(np.exp(resultado.x[-1])),
         tasa_rojas=tasa_rojas,
         n_partidos=len(partidos),
+        partidos_equipo=partidos_equipo,
     )
 
 

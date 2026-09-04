@@ -28,6 +28,13 @@ raro: hay 9.6 por partido. La media ya hace ese trabajo de suavizado, y
 no existe un "xCorners" con la solidez del xG. Buscarlo seria complicar
 por gusto.
 
+Encogimiento hacia la media (D-27)
+----------------------------------
+El Rayo salio con 13.7 corners esperados contra el Racing recien
+ascendido: la concesion del Racing con 3 partidos estaba disparatada y
+multiplicaba. Generacion y concesion se mezclan con el 1.00 de la liga
+en proporcion a la muestra, usando la misma funcion que dixon_coles.py.
+
 Estructura
 ----------
 Igual que dixon_coles.py, para no aprender un patron nuevo: generacion y
@@ -44,7 +51,7 @@ apuestas, no estadistica. No se usa en NADA publicable: en los posts se
 habla con enteros y en castellano. Ver 00_PROYECTO.md §8.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
@@ -53,14 +60,14 @@ from scipy.special import gammaln
 from scipy.stats import nbinom
 
 from src.models.criba import XI
-from src.models.dixon_coles import pesos_temporales
+from src.models.dixon_coles import K_ENCOGIMIENTO, encoger, pesos_temporales
 
 MAX_CORNERS = 25  # cola suficiente: el maximo historico por equipo esta lejos
 
 
 @dataclass
 class ParametrosCorners:
-    """Resultado de un ajuste."""
+    """Resultado de un ajuste. Los parametros ya vienen encogidos."""
 
     equipos: list[str]
     generacion: np.ndarray   # 1.00 = saca los corners de un equipo medio
@@ -69,9 +76,13 @@ class ParametrosCorners:
     nivel_liga: float        # corners de referencia por equipo y partido
     dispersion: float        # r; cuanto mas alto, mas se parece a Poisson
     n_partidos: int
+    partidos_equipo: dict[str, int] = field(default_factory=dict)
 
     def indice(self, equipo: str) -> int:
         return self.equipos.index(equipo)
+
+    def muestra(self, equipo: str) -> int:
+        return self.partidos_equipo.get(equipo, 0)
 
     def tabla(self) -> pd.DataFrame:
         """Generacion y concesion por equipo, de mas a menos corners."""
@@ -82,6 +93,7 @@ class ParametrosCorners:
                 "concesion": self.concesion,
             }
         )
+        df["partidos"] = df["equipo"].map(self.partidos_equipo).fillna(0).astype(int)
         return df.sort_values("generacion", ascending=False).reset_index(drop=True)
 
 
@@ -153,10 +165,14 @@ def ajustar(
     partidos: pd.DataFrame,
     xi: float = XI,
     referencia=None,
+    k: int = K_ENCOGIMIENTO,
 ) -> ParametrosCorners:
     """
     Columnas necesarias: fecha, local, visitante, corners_local,
     corners_visitante.
+
+    Los parametros devueltos ya vienen encogidos hacia la media (D-27).
+    Con k = 0 se desactiva el encogimiento, util para comparar.
     """
     partidos = partidos.dropna(
         subset=["corners_local", "corners_visitante"]
@@ -177,6 +193,14 @@ def ajustar(
     c_local = partidos["corners_local"].to_numpy(dtype=float)
     c_visit = partidos["corners_visitante"].to_numpy(dtype=float)
     pesos = pesos_temporales(partidos["fecha"], referencia, xi)
+
+    # Partidos por equipo. Es lo que gobierna el encogimiento.
+    conteo = (
+        pd.concat([partidos["local"], partidos["visitante"]])
+        .value_counts()
+        .to_dict()
+    )
+    partidos_equipo = {e: int(conteo.get(e, 0)) for e in equipos}
 
     # Punto de partida: todos los equipos iguales, ventaja de campo leve,
     # nivel de liga en la media observada, dispersion moderada.
@@ -201,14 +225,25 @@ def ajustar(
     log_concesion = resultado.x[n : 2 * n]
     log_concesion = log_concesion - log_concesion.mean()
 
+    generacion = np.exp(log_generacion)
+    concesion = np.exp(log_concesion)
+
+    # Encogimiento (D-27). Una sola vez, aqui, para que todo lo que
+    # salga de este objeto hable con los mismos numeros.
+    if k > 0:
+        muestras = np.array([partidos_equipo[e] for e in equipos], dtype=float)
+        generacion = encoger(generacion, muestras, k)
+        concesion = encoger(concesion, muestras, k)
+
     return ParametrosCorners(
         equipos=equipos,
-        generacion=np.exp(log_generacion),
-        concesion=np.exp(log_concesion),
+        generacion=generacion,
+        concesion=concesion,
         ventaja_campo=float(np.exp(resultado.x[-3])),
         nivel_liga=float(np.exp(resultado.x[-2])),
         dispersion=float(np.exp(resultado.x[-1])),
         n_partidos=len(partidos),
+        partidos_equipo=partidos_equipo,
     )
 
 
