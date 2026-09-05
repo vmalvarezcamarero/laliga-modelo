@@ -1,6 +1,6 @@
 {
   "version_esquema": 1,
-  "generado": "2026-09-05T16:19:48.572472+02:00",
+  "generado": "2026-09-05T16:55:38.514944+02:00",
   "temporada": "2026-27",
   "jornada_etiqueta": 4,
   "semana_mezclada": false,
@@ -19,49 +19,49 @@
         "equipo": "Barcelona",
         "fuerza": 2.29,
         "distancia": 1.09,
-        "estado": "sigue_dentro",
+        "estado": "sin_referencia",
         "partidos": 459
       },
       {
         "equipo": "Real Madrid",
         "fuerza": 2.08,
         "distancia": 0.88,
-        "estado": "sigue_dentro",
+        "estado": "sin_referencia",
         "partidos": 459
       },
       {
         "equipo": "Atlético",
         "fuerza": 1.66,
         "distancia": 0.46,
-        "estado": "sigue_dentro",
+        "estado": "sin_referencia",
         "partidos": 459
       },
       {
         "equipo": "Villarreal",
         "fuerza": 1.43,
         "distancia": 0.23,
-        "estado": "sigue_dentro",
+        "estado": "sin_referencia",
         "partidos": 459
       },
       {
         "equipo": "Athletic",
         "fuerza": 1.43,
         "distancia": 0.23,
-        "estado": "sigue_dentro",
+        "estado": "sin_referencia",
         "partidos": 459
       },
       {
         "equipo": "Betis",
         "fuerza": 1.25,
         "distancia": 0.05,
-        "estado": "sigue_dentro",
+        "estado": "sin_referencia",
         "partidos": 421
       },
       {
         "equipo": "Real Sociedad",
         "fuerza": 1.25,
         "distancia": 0.05,
-        "estado": "sigue_dentro",
+        "estado": "sin_referencia",
         "partidos": 459
       }
     ],
@@ -70,84 +70,84 @@
         "equipo": "Celta",
         "fuerza": 1.09,
         "distancia": -0.11,
-        "estado": "sigue_fuera",
+        "estado": "sin_referencia",
         "partidos": 459
       },
       {
         "equipo": "Rayo",
         "fuerza": 1.08,
         "distancia": -0.12,
-        "estado": "sigue_fuera",
+        "estado": "sin_referencia",
         "partidos": 307
       },
       {
         "equipo": "Alavés",
         "fuerza": 1.07,
         "distancia": -0.13,
-        "estado": "sigue_fuera",
+        "estado": "sin_referencia",
         "partidos": 345
       },
       {
         "equipo": "Valencia",
         "fuerza": 1.05,
         "distancia": -0.15,
-        "estado": "sigue_fuera",
+        "estado": "sin_referencia",
         "partidos": 459
       },
       {
         "equipo": "Osasuna",
         "fuerza": 1.03,
         "distancia": -0.17,
-        "estado": "sigue_fuera",
+        "estado": "sin_referencia",
         "partidos": 307
       },
       {
         "equipo": "Sevilla",
         "fuerza": 1.02,
         "distancia": -0.18,
-        "estado": "sigue_fuera",
+        "estado": "sin_referencia",
         "partidos": 459
       },
       {
         "equipo": "Levante",
         "fuerza": 1.01,
         "distancia": -0.19,
-        "estado": "sigue_fuera",
+        "estado": "sin_referencia",
         "partidos": 307
       },
       {
         "equipo": "Getafe",
         "fuerza": 0.92,
         "distancia": -0.28,
-        "estado": "sigue_fuera",
+        "estado": "sin_referencia",
         "partidos": 421
       },
       {
         "equipo": "Espanyol",
         "fuerza": 0.89,
         "distancia": -0.31,
-        "estado": "sigue_fuera",
+        "estado": "sin_referencia",
         "partidos": 383
       },
       {
         "equipo": "Málaga",
         "fuerza": 0.78,
         "distancia": -0.42,
-        "estado": "sigue_fuera",
+        "estado": "sin_referencia",
         "partidos": 155
       },
       {
         "equipo": "Dépor",
         "fuerza": 0.77,
         "distancia": -0.43,
-        "estado": "sigue_fuera",
+        "estado": "sin_referencia",
         "partidos": 155
       },
       {
         "equipo": "Elche",
         "fuerza": 0.77,
         "distancia": -0.43,
-        "estado": "sigue_fuera",
+        "estado": "sin_referencia",
         "partidos": 193
       }
     ],
@@ -161,7 +161,7 @@
       "n_pasan": 7,
       "entran": [],
       "salen": [],
-      "primera_criba": false
+      "primera_criba": true
     }
   },
   "partidos": [

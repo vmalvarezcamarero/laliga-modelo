@@ -1,0 +1,27 @@
+[
+  {
+    "texto": "El Celta se queda a 0.11 del umbral. Entre él y la Real Sociedad, que sí pasa, hay una distancia de 0.16. EGO no ve un equipo cerca. Ve un equipo que no llega, y punto.",
+    "por_que": "Descarte en seco, cifra exacta del gancho, cierre indiferente",
+    "sospechosos": []
+  },
+  {
+    "texto": "Jornada 4. Siete equipos pasan la criba con fuerza igual o superior a 1.2. El Celta se queda fuera por 0.11. El umbral no negocia con quien casi llega.",
+    "por_que": "Explica el umbral y cuántos pasan, ángulo distinto",
+    "sospechosos": []
+  },
+  {
+    "texto": "Real Sociedad pasa. Celta no. Los separan apenas 0.16 de fuerza. EGO traza la línea igual, sin mirar atrás.",
+    "por_que": "Contraste directo entre dos equipos, copiando distancia_al_anterior",
+    "sospechosos": []
+  },
+  {
+    "texto": "La criba no sabe que el Celta lleva partidos generando ilusión. Sabe que su fuerza es 1.09 y el corte está en 1.2. Con eso le basta.",
+    "por_que": "Angulo de lo que la criba ignora frente al relato",
+    "sospechosos": []
+  },
+  {
+    "texto": "EGO ha mirado al Celta, a 0.11 del corte, y no ha dicho nada. Ese silencio es su forma de decir que no pasa.",
+    "por_que": "Voz de la cuenta traduciendo la indiferencia de EGO",
+    "sospechosos": []
+  }
+]
