@@ -153,7 +153,9 @@ def _contar_jornadas(partidos: list[Partido]) -> dict[int, int]:
     return cuenta
 
 
-def para_predecir(referencia: datetime | None = None) -> Semana:
+def para_predecir(
+    referencia: datetime | None = None, simular: bool = False
+) -> Semana:
     """Partidos de la ventana que viene, aún sin jugar.
 
     Dos filtros independientes, y basta con que uno diga que no:
@@ -163,12 +165,28 @@ def para_predecir(referencia: datetime | None = None) -> Semana:
     El segundo existe porque `matches` puede ir retrasada respecto a la
     realidad. No saber el resultado no es lo mismo que no haberse jugado,
     y dictaminar sobre un partido terminado es el peor fallo posible (D-26).
+
+    `simular=True` salta los dos filtros y devuelve la ventana como
+    estaba antes de jugarse. Sirve para reconstruir semanas pasadas y
+    probar el bucle completo de publicación y auditoría. NUNCA se usa en
+    producción: un JSON generado así diría que predice partidos que ya
+    han terminado.
     """
     referencia = _normalizar(referencia)
     desde, hasta = ventana(referencia)
-    conocidos = _resultados_conocidos()
 
     todos = _leer_fixtures(desde, hasta)
+
+    if simular:
+        jornadas = _contar_jornadas(todos)
+        avisos = ["SIMULACION: la ventana se ha reconstruido ignorando los "
+                  "resultados ya conocidos. No publicar."]
+        if len(jornadas) > 1:
+            detalle = ", ".join(f"J{j}: {n}" for j, n in sorted(jornadas.items()))
+            avisos.append(f"Semana con partidos de varias jornadas ({detalle}).")
+        return Semana(desde, hasta, todos, jornadas, avisos)
+
+    conocidos = _resultados_conocidos()
 
     pendientes, con_resultado, limbo = [], [], []
     for p in todos:

@@ -86,32 +86,49 @@ def _equipos_de_la_temporada(temporada: str) -> set[str]:
     return {f[0] for f in filas}
 
 
-def _criba_anterior() -> set[str] | None:
+def _criba_anterior(desde: str | None = None) -> set[str] | None:
     """
-    Quien pasaba la criba la semana pasada.
+    Quien pasaba la criba en la ventana INMEDIATAMENTE anterior.
 
-    Devuelve None si no hay JSON anterior: sin referencia no se puede
+    Se busca por ventana, no por orden alfabetico de fichero: al
+    reconstruir una semana pasada, el ultimo fichero del directorio es
+    posterior y daria estados `entra`/`cae` invertidos.
+
+    Devuelve None si no hay ventana previa: sin referencia no se puede
     decir que nadie "entra" ni "cae". Un set vacio significaria que la
     semana pasada no paso nadie, que es otra cosa.
     """
     if not SALIDA.exists():
         return None
-    previos = sorted(SALIDA.glob("*_prediccion.json"))
-    if not previos:
+
+    candidatos = []
+    for ruta in SALIDA.glob("*_prediccion.json"):
+        try:
+            doc = json.loads(ruta.read_text(encoding="utf-8"))
+            inicio = doc["ventana"]["desde"]
+        except (json.JSONDecodeError, KeyError):
+            continue
+        if desde is None or inicio < desde:
+            candidatos.append((inicio, doc))
+
+    if not candidatos:
         return None
+
+    _, previo = max(candidatos, key=lambda c: c[0])
     try:
-        datos = json.loads(previos[-1].read_text(encoding="utf-8"))
-        return {e["equipo"] for e in datos["criba"]["pasan"]}
-    except (json.JSONDecodeError, KeyError):
+        return {e["equipo"] for e in previo["criba"]["pasan"]}
+    except KeyError:
         return None
 
 
 # --- Criba ----------------------------------------------------------
 
 
-def _construir_criba(tabla: pd.DataFrame, de_la_liga: set[str]) -> dict:
+def _construir_criba(
+    tabla: pd.DataFrame, de_la_liga: set[str], desde: str | None = None
+) -> dict:
     tabla = tabla[tabla["equipo"].isin(de_la_liga)].copy()
-    antes = _criba_anterior()
+    antes = _criba_anterior(desde)
     primera = antes is None
 
     pasan, no_pasan, sin_datos = [], [], []
@@ -391,8 +408,17 @@ def _ganchos(partidos: list[dict], criba: dict) -> dict:
 # --- Ensamblado -----------------------------------------------------
 
 
-def generar(referencia: datetime | None = None, escribir: bool = True) -> dict:
-    semana = para_predecir(referencia)
+def generar(
+    referencia: datetime | None = None,
+    escribir: bool = True,
+    simular: bool = False,
+) -> dict:
+    """
+    `simular=True` reconstruye una ventana pasada ignorando que sus
+    partidos ya se jugaron. Sirve para probar el bucle completo de
+    prediccion y auditoria. NUNCA en produccion.
+    """
+    semana = para_predecir(referencia, simular=simular)
 
     if not semana.partidos:
         raise RuntimeError("No hay partidos que predecir en esta ventana.")
@@ -414,7 +440,11 @@ def generar(referencia: datetime | None = None, escribir: bool = True) -> dict:
     corn = corners.ajustar(entrenamiento, xi=XI)
     tarj = cards.ajustar(entrenamiento, xi=XI)
 
-    criba = _construir_criba(dc.tabla(), _equipos_de_la_temporada(temporada))
+    criba = _construir_criba(
+        dc.tabla(),
+        _equipos_de_la_temporada(temporada),
+        desde=semana.desde.isoformat(),
+    )
     partidos, avisos = _construir_partidos(semana, dc, corn, tarj, criba)
 
     documento = {
@@ -447,7 +477,13 @@ def generar(referencia: datetime | None = None, escribir: bool = True) -> dict:
 
 
 if __name__ == "__main__":
-    d = generar()
+    # Con una fecha se reconstruye una ventana pasada, para probar:
+    #   python -m src.content.jornada_json 2026-08-31
+    if len(sys.argv) > 1:
+        ref = pd.Timestamp(sys.argv[1]).to_pydatetime()
+        d = generar(ref, simular=True)
+    else:
+        d = generar()
 
     c = d["criba"]
     print(f"\nCRIBA (umbral {c['umbral']}): pasan {c['resumen']['n_pasan']}")
@@ -464,12 +500,13 @@ if __name__ == "__main__":
         print(f"  {marca} {p['local']:<14} {pr['local']:>3}  {pr['empate']:>3}  "
               f"{pr['visitante']:>3}  {p['visitante']:<14} H={p['entropia']:.2f}")
 
-    print("\nZONA DE CORTE")
-    for e in d["ganchos"]["F1_descarte"]["apretados"]:
-        sep = e.get("distancia_al_anterior", "")
-        marca = "PASA" if e["pasa"] else "    "
-        print(f"   {marca}  {e['equipo']:<14} {e['fuerza']:.2f}   "
-              f"al anterior: {sep}")
+    if d["ganchos"]["F1_descarte"]:
+        print("\nZONA DE CORTE")
+        for e in d["ganchos"]["F1_descarte"]["apretados"]:
+            sep = e.get("distancia_al_anterior", "")
+            marca = "PASA" if e["pasa"] else "    "
+            print(f"   {marca}  {e['equipo']:<14} {e['fuerza']:.2f}   "
+                  f"al anterior: {sep}")
 
     print("\nGANCHOS")
     for k, v in d["ganchos"].items():

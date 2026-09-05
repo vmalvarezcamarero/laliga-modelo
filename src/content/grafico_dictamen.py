@@ -17,14 +17,9 @@ Decisiones de diseno
    leyenda. Nada de verde y rojo, que es estetica de casa de apuestas
    (00_PROYECTO.md §8).
 
-3. El ambar pinta el segmento ganador de la prediccion mas atrevida,
-   que es la que comenta el texto del tuit. Un solo acento por grafico,
-   y sigue significando lo mismo que en F1 y F5: aqui es donde hay que
-   mirar.
-
-   Se probo antes una marca vertical al margen y no cabia: entre el
-   nombre del equipo y el inicio de la barra no hay hueco. Pintar el
-   segmento se ve mejor y no estorba a nada.
+3. El ambar marca la prediccion mas atrevida, que es la que comenta el
+   texto del tuit. Un solo acento por grafico, y sigue significando lo
+   mismo que en F1 y F5: aqui es donde hay que mirar.
 
    "Atrevida" se define como la mayor probabilidad concedida a un
    visitante. En futbol, apostar por el que juega fuera es la
@@ -59,9 +54,6 @@ COLOR_LOCAL = estilo.TEXTO
 COLOR_EMPATE = "#4A5058"
 COLOR_VISITANTE = "#8B939C"
 
-# Sobre estos dos fondos, que son claros, el texto va oscuro.
-FONDOS_CLAROS = {COLOR_LOCAL, estilo.AMBAR}
-
 
 def dibujar(
     partidos: pd.DataFrame,
@@ -87,10 +79,6 @@ def dibujar(
         colores = [COLOR_LOCAL, COLOR_EMPATE, COLOR_VISITANTE]
         es_destacada = i == destacar
 
-        if es_destacada:
-            # El segmento ganador de la fila destacada va en ambar.
-            colores[valores.index(max(valores))] = estilo.AMBAR
-
         izquierda = 0.0
         for valor, color in zip(valores, colores):
             ax.barh(
@@ -98,7 +86,8 @@ def dibujar(
                 color=color, edgecolor=estilo.FONDO, linewidth=1.5,
             )
             if valor >= MINIMO_PARA_ESCRIBIR:
-                sobre_claro = color in FONDOS_CLAROS
+                # Sobre gris claro el texto va oscuro, y al reves.
+                sobre_claro = color == COLOR_LOCAL
                 ax.text(
                     izquierda + valor / 2, i,
                     f"{valor * 100:.0f}%",
@@ -107,6 +96,8 @@ def dibujar(
                     weight="bold" if sobre_claro else "normal",
                 )
             izquierda += valor
+
+        
 
     etiquetas = [
         f"{fila['local']} - {fila['visitante']}"
