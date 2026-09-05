@@ -7,3 +7,5 @@ outputs/charts/
 .DS_Store
 
 criba_*.txt
+
+outputs/borradores/
