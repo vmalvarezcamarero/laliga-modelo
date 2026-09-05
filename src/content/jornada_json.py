@@ -53,6 +53,9 @@ VERSION_ESQUEMA = 1
 # merecen. La exclusion visual resuelve eso (D-25).
 MIN_PARTIDOS_CRIBA = 10
 
+# Cuantos equipos a cada lado del corte se incluyen en `apretados`.
+EQUIPOS_APRETADOS = 3
+
 # Frecuencias base de LaLiga. Sirven de referencia para medir cuanto se
 # aleja EGO de lo que diria cualquiera, cuando no hay choque directo.
 BASE_LIGA = (0.45, 0.25, 0.30)
@@ -255,6 +258,38 @@ def _construir_partidos(
 # --- Ganchos --------------------------------------------------------
 
 
+def _apretados(criba: dict) -> list[dict]:
+    """
+    Los equipos que rodean la linea de corte, con las distancias ENTRE
+    ELLOS ya calculadas.
+
+    Existe por P-13. Un borrador escribio "0.16 puntos" restando 0.05 de
+    -0.11: el dato que queria no estaba en el JSON, asi que lo calculo.
+    La prohibicion de calcular no se cumple sola; darle el numero hecho,
+    si. Ademas el contraste entre quien pasa raspado y quien no llega es
+    de lo mejor que da la criba como contenido.
+    """
+    ultimos = criba["pasan"][-EQUIPOS_APRETADOS:]
+    primeros = criba["no_pasan"][:EQUIPOS_APRETADOS]
+    zona = ultimos + primeros
+
+    filas = []
+    for i, e in enumerate(zona):
+        fila = {
+            "equipo": e["equipo"],
+            "fuerza": e["fuerza"],
+            "distancia_al_umbral": e["distancia"],
+            "pasa": e in ultimos,
+        }
+        if i > 0:
+            fila["distancia_al_anterior"] = round(
+                zona[i - 1]["fuerza"] - e["fuerza"], 2
+            )
+        filas.append(fila)
+
+    return filas
+
+
 def _distancia_a_la_liga(p: dict) -> float:
     """Cuanto se aleja EGO del 45/25/30 de LaLiga, en puntos."""
     return (
@@ -283,7 +318,6 @@ def _atrevida(partidos: list[dict]) -> dict | None:
         if not p["criba"]["choque_directo"]:
             continue
         if p["criba"]["local"]:
-            # El que no pasa es el visitante.
             candidatos.append((p, p["prob"]["visitante"], p["visitante"]))
         else:
             candidatos.append((p, p["prob"]["local"], p["local"]))
@@ -331,6 +365,7 @@ def _ganchos(partidos: list[dict], criba: dict) -> dict:
             "equipo": elegido["equipo"],
             "cifra": elegido["distancia"],
             "motivo": "cae_esta_semana" if caen else "mas_cerca_del_corte",
+            "apretados": _apretados(criba),
         }
 
     g["F2_atrevida"] = _atrevida(partidos)
@@ -429,8 +464,17 @@ if __name__ == "__main__":
         print(f"  {marca} {p['local']:<14} {pr['local']:>3}  {pr['empate']:>3}  "
               f"{pr['visitante']:>3}  {p['visitante']:<14} H={p['entropia']:.2f}")
 
+    print("\nZONA DE CORTE")
+    for e in d["ganchos"]["F1_descarte"]["apretados"]:
+        sep = e.get("distancia_al_anterior", "")
+        marca = "PASA" if e["pasa"] else "    "
+        print(f"   {marca}  {e['equipo']:<14} {e['fuerza']:.2f}   "
+              f"al anterior: {sep}")
+
     print("\nGANCHOS")
     for k, v in d["ganchos"].items():
+        if k == "F1_descarte" and v:
+            v = {x: y for x, y in v.items() if x != "apretados"}
         print(f"   {k}: {v}")
 
     for a in d["advertencias"]:

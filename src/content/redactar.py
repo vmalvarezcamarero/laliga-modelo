@@ -4,7 +4,7 @@ Generacion de borradores: la Skill de voz.
 Recibe el JSON de la jornada y devuelve borradores rankeados para un
 formato concreto. El humano elige uno en Telegram (00_PROYECTO.md §12).
 
-DOS PRINCIPIOS:
+TRES PRINCIPIOS:
 
 1. La voz vive en docs/02_VOZ_Y_FORMATOS.md, no aqui. Se lee en cada
    llamada. Ajustar como habla EGO es editar ese Markdown, sin tocar
@@ -17,20 +17,21 @@ DOS PRINCIPIOS:
    llegaria al redactor sin que nadie lo decidiera. La garantia no es
    la instruccion, es el recorte.
 
-COSTE. La guia de voz son ~5.300 tokens de entrada por llamada, y eso
-es fijo. Lo que se disparo en las pruebas fue la SALIDA: el modelo trae
-razonamiento extendido por defecto y ese bloque se comia los 4000
-tokens antes de escribir una palabra. Se desactiva con thinking. Para
-escribir cinco tuits con la guia delante y el gancho ya elegido por el
-pipeline no aporta nada.
+3. Los numeros del borrador se verifican contra el JSON (P-13). La
+   instruccion de no calcular no se cumple sola: un borrador escribio
+   "0.16 puntos" restando dos cifras del documento. Se marcan, NO se
+   descartan: "7 de 20" es legitimo aunque el 20 no sea un campo, y un
+   filtro automatico tiraria buenos borradores sin que nadie se entere.
 
-MAX_TOKENS no es un presupuesto que se gaste: es un freno. Solo se paga
-lo generado. Se deja bajo a proposito para que un descontrol se corte
-con un error claro en vez de con una factura silenciosa.
+COSTE. La guia son ~5.300 tokens de entrada por llamada, y eso es fijo.
+Lo que se disparo en las pruebas fue la SALIDA: el razonamiento
+extendido se comia los 4.000 tokens antes de escribir una palabra. Se
+desactiva con `thinking`. Medido: ~2 centimos por llamada.
 """
 
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -48,7 +49,8 @@ MODELO = "claude-sonnet-5"
 # ocho borradores casi identicos son peor que cinco distintos.
 N_BORRADORES = 5
 
-# Freno, no presupuesto. Ver la nota de coste arriba.
+# Freno, no presupuesto: solo se paga lo generado. Se deja bajo para que
+# un descontrol se corte con un error en vez de con una factura.
 MAX_TOKENS = 4000
 
 
@@ -82,6 +84,11 @@ dado en el campo `gancho`. No elijas tu el protagonista.
 
 Longitud: entre 180 y 260 caracteres. Es un tuit, no un parrafo.
 
+El campo `gancho.apretados` trae los equipos que rodean la linea de
+corte con las distancias ENTRE ELLOS ya calculadas, en
+`distancia_al_anterior`. Si quieres contrastar a quien pasa raspado con
+quien no llega, COPIA ese numero. No lo calcules restando dos fuerzas.
+
 Si `criba.resumen.primera_criba` es true, NO digas que nadie "entra"
 ni "cae": no hay semana anterior con la que comparar. Presenta la criba
 como un estado, no como un cambio.
@@ -114,9 +121,9 @@ la letra, incluidas las prohibiciones absolutas.
 
 REGLAS DE SALIDA, ademas de todo lo anterior:
 
-- Cada borrador usa SOLO cifras que aparezcan en los datos que recibes.
-  No calcules, no redondees, no deduzcas numeros nuevos. Si un numero no
-  esta en los datos, no existe.
+- Cada borrador usa SOLO cifras que aparezcan literalmente en los datos
+  que recibes. No calcules, no restes, no redondees, no deduzcas numeros
+  nuevos. Si un numero no esta en los datos, no existe.
 - Nada de cuotas, casas de apuestas, "value" ni recomendaciones de
   jugada, en ninguna forma ni como broma.
 - Sin emojis. Sin hashtags. Sin signos de exclamacion.
@@ -142,6 +149,60 @@ DATOS DE LA JORNADA:
 Genera {N_BORRADORES} borradores."""
 
 
+# --- Verificacion de numeros (P-13) ---------------------------------
+
+# Captura enteros y decimales, con punto o coma. El signo se ignora a
+# proposito: el JSON guarda -0.11 y el borrador puede escribir "0.11"
+# de forma perfectamente correcta ("se queda a 0.11 del corte").
+_NUMERO = re.compile(r"\d+(?:[.,]\d+)?")
+
+
+def _normalizar(texto: str) -> str:
+    """'0,16' y '0.160' son el mismo numero. '1.20' y '1.2' tambien."""
+    valor = float(texto.replace(",", "."))
+    return f"{valor:g}"
+
+
+def _numeros_del_json(datos) -> set[str]:
+    """Todos los numeros que aparecen en el recorte, normalizados."""
+    encontrados = set()
+
+    def recorrer(nodo):
+        if isinstance(nodo, dict):
+            for v in nodo.values():
+                recorrer(v)
+        elif isinstance(nodo, list):
+            for v in nodo:
+                recorrer(v)
+        elif isinstance(nodo, bool):
+            pass  # True/False no son cifras publicables
+        elif isinstance(nodo, (int, float)):
+            encontrados.add(f"{abs(nodo):g}")
+        elif isinstance(nodo, str):
+            for m in _NUMERO.findall(nodo):
+                encontrados.add(_normalizar(m))
+
+    recorrer(datos)
+    return encontrados
+
+
+def numeros_sospechosos(texto: str, datos: dict) -> list[str]:
+    """
+    Cifras del borrador que no aparecen en el recorte del JSON.
+
+    NO son necesariamente errores: "7 de 20 equipos" marca el 20, que es
+    legitimo. Por eso se senalan y las lee el humano, en vez de
+    descartarse solas.
+    """
+    permitidos = _numeros_del_json(datos)
+    fuera = []
+    for m in _NUMERO.findall(texto):
+        n = _normalizar(m)
+        if n not in permitidos and n not in fuera:
+            fuera.append(n)
+    return fuera
+
+
 # --- Llamada --------------------------------------------------------
 
 
@@ -156,6 +217,10 @@ def _ultimo_json(patron: str = "*_prediccion.json") -> dict:
 
 
 def generar(formato: str = "F1", doc: dict | None = None) -> list[dict]:
+    """
+    Devuelve los borradores rankeados. Cada uno con:
+      texto, por_que, sospechosos[]
+    """
     if formato not in RECORTES:
         raise ValueError(
             f"Formato {formato} sin recorte definido. "
@@ -195,17 +260,13 @@ def generar(formato: str = "F1", doc: dict | None = None) -> list[dict]:
             f"el razonamiento extendido es lo que disparaba la salida."
         )
 
-    # La respuesta puede traer bloques de razonamiento antes del texto.
-    # Solo nos quedamos con los de tipo `text`.
     bruto = "".join(
         b.text for b in respuesta.content if getattr(b, "type", None) == "text"
     ).strip()
 
     if not bruto:
         tipos = [b.type for b in respuesta.content]
-        raise RuntimeError(
-            f"La respuesta no traia texto. Bloques recibidos: {tipos}"
-        )
+        raise RuntimeError(f"La respuesta no traia texto. Bloques: {tipos}")
 
     # Red de seguridad: si el modelo envuelve el JSON en backticks pese
     # a la instruccion, se limpia en vez de reventar.
@@ -216,11 +277,16 @@ def generar(formato: str = "F1", doc: dict | None = None) -> list[dict]:
         bruto = bruto.strip()
 
     try:
-        return json.loads(bruto)["borradores"]
+        borradores = json.loads(bruto)["borradores"]
     except (json.JSONDecodeError, KeyError) as e:
         print("La respuesta no venia en el formato esperado:\n")
         print(bruto)
         raise RuntimeError("Respuesta mal formada.") from e
+
+    for b in borradores:
+        b["sospechosos"] = numeros_sospechosos(b["texto"], datos)
+
+    return borradores
 
 
 if __name__ == "__main__":
@@ -230,8 +296,21 @@ if __name__ == "__main__":
     borradores = generar(formato)
 
     print()
+    con_avisos = 0
     for i, b in enumerate(borradores, 1):
         texto = b["texto"]
         print(f"--- {i} ---  ({len(texto)} caracteres)")
         print(texto)
-        print(f"    [{b['por_que']}]\n")
+        print(f"    [{b['por_que']}]")
+        if b["sospechosos"]:
+            con_avisos += 1
+            print(f"    !! cifras que no estan en el JSON: "
+                  f"{', '.join(b['sospechosos'])}")
+        print()
+
+    if con_avisos:
+        print(f"{con_avisos} de {len(borradores)} borradores llevan cifras "
+              f"sin respaldo. Comprueba antes de publicar.")
+    else:
+        print("Todas las cifras estan respaldadas por el JSON.")
+        
