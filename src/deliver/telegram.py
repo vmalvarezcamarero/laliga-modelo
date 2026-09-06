@@ -13,6 +13,19 @@ script pregunta un rato y se muere. Cero infraestructura.
 Consecuencia asumida: el bot no escucha siempre. Si no respondes en
 ESPERA_MINUTOS, los borradores quedan guardados en outputs/borradores/
 y los recuperas cuando puedas.
+
+DOS COSAS APRENDIDAS EN EL PRIMER CRON:
+
+1. Las credenciales se limpian con .strip(). Un salto de linea invisible
+   al final de un secreto de GitHub rompia la comparacion de chat_id sin
+   dar ningun error: el bot leia los mensajes, los descartaba por "no
+   autorizados" y seguia esperando en silencio. Un espacio no puede
+   tumbar el sistema.
+
+2. Un bot con polling solo admite UN consumidor a la vez. Telegram
+   entrega cada actualizacion una sola vez, al primero que la pide. Si
+   el cron esta esperando y ademas lanzas el script en local, se roban
+   los mensajes entre si. No se lanzan los dos a la vez.
 """
 
 import json
@@ -38,8 +51,15 @@ INTERVALO_SEGUNDOS = 3
 
 
 def _credenciales() -> tuple[str, str]:
-    token = os.environ.get("TELEGRAM_TOKEN")
-    chat = os.environ.get("TELEGRAM_CHAT_ID")
+    """
+    Token y chat autorizado, SIN espacios ni saltos de linea.
+
+    El .strip() no es cosmetico: un secreto de GitHub con un salto de
+    linea al final produce un 404 en el token y un filtro de chat que
+    no coincide nunca. Los dos fallos son silenciosos.
+    """
+    token = (os.environ.get("TELEGRAM_TOKEN") or "").strip()
+    chat = (os.environ.get("TELEGRAM_CHAT_ID") or "").strip()
     if not token or not chat:
         raise RuntimeError(
             "Faltan TELEGRAM_TOKEN o TELEGRAM_CHAT_ID.\n"
@@ -83,6 +103,8 @@ def esperar_respuesta(
     offset = _ultimo_update_id(token)
     limite = time.time() + minutos * 60
 
+    ajenos = 0
+
     while time.time() < limite:
         try:
             r = requests.get(
@@ -97,17 +119,32 @@ def esperar_respuesta(
         for u in r.get("result", []):
             offset = u["update_id"] + 1
             msg = u.get("message", {})
+            emisor = str(msg.get("chat", {}).get("id", ""))
+            texto = (msg.get("text") or "").strip().lower()
 
             # Solo se atiende al chat autorizado. Si alguien encuentra
-            # el bot y le escribe, se ignora.
-            if str(msg.get("chat", {}).get("id")) != str(chat):
+            # el bot y le escribe, se ignora. Se avisa por consola: un
+            # descarte silencioso aqui es indistinguible de "no has
+            # respondido", y eso cuesta media hora de diagnostico.
+            if emisor != chat:
+                ajenos += 1
+                print(
+                    f"   mensaje de un chat no autorizado ({emisor!r}, "
+                    f"esperado {chat!r}). Ignorado."
+                )
                 continue
 
-            texto = (msg.get("text") or "").strip().lower()
             if texto in validas:
                 return texto
 
+            print(f"   respuesta no reconocida: {texto!r}. Se esperaba "
+                  f"{sorted(validas)}.")
+
         time.sleep(INTERVALO_SEGUNDOS)
+
+    if ajenos:
+        print(f"\n   {ajenos} mensaje(s) descartados por chat no autorizado. "
+              f"Comprueba TELEGRAM_CHAT_ID.")
 
     return None
 
@@ -145,6 +182,9 @@ def repartir(formato: str) -> dict | None:
     """
     Genera, envia, espera y devuelve el borrador elegido.
     """
+    token, chat = _credenciales()
+    print(f"Bot listo. Chat autorizado: {chat}")
+
     print(f"Generando borradores de {formato}...")
     borradores = generar(formato)
 
