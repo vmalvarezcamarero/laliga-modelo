@@ -8,23 +8,22 @@ TRES PRINCIPIOS:
 
 1. La voz vive en docs/02_VOZ_Y_FORMATOS.md, no aqui. Se lee en cada
    llamada. Ajustar como habla EGO es editar ese Markdown, sin tocar
-   codigo ni desplegar nada. Es lo que hace sostenible el techo de 15
-   minutos semanales.
+   codigo ni desplegar nada.
 
 2. Cada formato ve SOLO su parcela del JSON. Un F1 recibe la criba y
-   nada mas; un F5 recibe el veredicto y nada de la semana que viene.
-   Si le das el documento entero, mete partidos en un post que va sobre
-   la criba. La garantia no es la instruccion, es el recorte.
+   nada mas; un F5, el veredicto y nada de la semana que viene; un F4,
+   el partido de la encuesta SIN las probabilidades de EGO. La garantia
+   no es la instruccion, es el recorte: lo que no esta delante no se
+   puede publicar.
 
-3. Los numeros del borrador se verifican contra el JSON (P-13). La
-   instruccion de no calcular no se cumple sola: un borrador escribio
-   "0.16 puntos" restando dos cifras. Se marcan, NO se descartan: "7 de
-   20" es legitimo aunque el 20 no sea un campo.
+3. Los numeros del borrador se verifican contra el JSON (P-13). Se
+   marcan, NO se descartan: "7 de 20" es legitimo aunque el 20 no sea
+   un campo.
 
 COSTE. La guia son ~5.300 tokens de entrada por llamada, y eso es fijo.
-Lo que se disparo en las pruebas fue la SALIDA: el razonamiento
-extendido se comia los 4.000 tokens antes de escribir una palabra. Se
-desactiva con `thinking`. Medido: ~2 centimos por llamada.
+El razonamiento extendido se desactiva con `thinking`: sin eso se comia
+los 4.000 tokens antes de escribir una palabra. Medido: ~2 centimos por
+llamada.
 """
 
 import json
@@ -43,16 +42,13 @@ PREDICCIONES = BASE / "outputs" / "predictions"
 
 MODELO = "claude-sonnet-5"
 
-# Cinco y no ocho: en Telegram los lees en menos de cinco minutos, y
-# ocho borradores casi identicos son peor que cinco distintos.
+# Cinco y no ocho: en Telegram los lees en menos de cinco minutos.
 N_BORRADORES = 5
 
 # Freno, no presupuesto: solo se paga lo generado.
 MAX_TOKENS = 4000
 
 # Por debajo de este margen de RPS, EGO gana pero no para presumir.
-# Decir "pasa la criba" tras ganar por 0.002 es cierto y editorialmente
-# falso. Un EGO que reconoce que ha ganado por los pelos es mas creible.
 MARGEN_RASPADO = 0.01
 
 
@@ -60,11 +56,18 @@ MARGEN_RASPADO = 0.01
 
 FUENTE = {
     "F1": "prediccion",
+    "F2": "prediccion",
+    "F3": "prediccion",
+    "F4": "prediccion",
     "F5": "auditoria",
 }
 
 
 # --- Recorte por formato --------------------------------------------
+
+
+def _partido(doc: dict, id_partido: str) -> dict | None:
+    return next((p for p in doc["partidos"] if p["id"] == id_partido), None)
 
 
 def _recortar_f1(doc: dict) -> dict:
@@ -73,6 +76,82 @@ def _recortar_f1(doc: dict) -> dict:
         "jornada": doc["jornada_etiqueta"],
         "criba": doc["criba"],
         "gancho": doc["ganchos"].get("F1_descarte"),
+    }
+
+
+def _recortar_f2(doc: dict) -> dict:
+    """
+    F2 - EL DICTAMEN. Los partidos y el gancho de la prediccion mas
+    atrevida. NO lleva la criba completa: eso es F1.
+    """
+    gancho = doc["ganchos"].get("F2_atrevida")
+    elegido = _partido(doc, gancho["partido"]) if gancho else None
+
+    return {
+        "jornada": doc["jornada_etiqueta"],
+        "n_partidos": len(doc["partidos"]),
+        "gancho": gancho,
+        "partido_del_gancho": elegido,
+        "todos_los_partidos": [
+            {
+                "local": p["local"],
+                "visitante": p["visitante"],
+                "prob": p["prob"],
+                "choque_directo": p["criba"]["choque_directo"],
+            }
+            for p in doc["partidos"]
+        ],
+    }
+
+
+def _recortar_f3(doc: dict) -> dict:
+    """
+    F3 - EL PUNTO CIEGO. UN partido y nada mas.
+
+    Es el formato mas pequeno del proyecto, y eso es deliberado: EGO
+    admitiendo que no sabe necesita tres frases, no diez.
+    """
+    gancho = doc["ganchos"].get("F3_punto_ciego")
+    elegido = _partido(doc, gancho["partido"]) if gancho else None
+
+    return {
+        "jornada": doc["jornada_etiqueta"],
+        "entropia": gancho["cifra"] if gancho else None,
+        "partido": (
+            {
+                "local": elegido["local"],
+                "visitante": elegido["visitante"],
+                "fecha": elegido["fecha"],
+                "prob": elegido["prob"],
+            }
+            if elegido else None
+        ),
+    }
+
+
+def _recortar_f4(doc: dict) -> dict:
+    """
+    F4 - EL DESAFIO. El partido de la encuesta, SIN las probabilidades
+    de EGO.
+
+    Esto es lo importante del recorte: el post pide al publico que vote
+    antes de saber que dice EGO. Si el redactor tuviera las
+    probabilidades delante las filtraria en el texto, por mucho que la
+    instruccion lo prohiba. La unica garantia es no darselas.
+    """
+    gancho = doc["ganchos"].get("F4_encuesta")
+    elegido = _partido(doc, gancho["partido"]) if gancho else None
+
+    return {
+        "jornada": doc["jornada_etiqueta"],
+        "partido": (
+            {
+                "local": elegido["local"],
+                "visitante": elegido["visitante"],
+                "fecha": elegido["fecha"],
+            }
+            if elegido else None
+        ),
     }
 
 
@@ -96,6 +175,9 @@ def _recortar_f5(doc: dict) -> dict:
 
 RECORTES = {
     "F1": _recortar_f1,
+    "F2": _recortar_f2,
+    "F3": _recortar_f3,
+    "F4": _recortar_f4,
     "F5": _recortar_f5,
 }
 
@@ -145,6 +227,86 @@ Cada borrador ataca el post desde un angulo distinto: el descarte en
 seco, cuantos pasan y que significa el umbral, el contraste entre dos
 equipos separados por poco, lo que la criba ignora, o la voz de la
 cuenta traduciendo a EGO. No la misma frase reordenada.""",
+
+    "F2": """FORMATO OBJETIVO: F2 - EL DICTAMEN (jueves).
+
+El post acompana a una imagen con la tabla de los partidos de la
+jornada y sus probabilidades 1X2. La imagen ya ensena todos los
+partidos: el texto NO los enumera ni hace un repaso.
+
+Estructura: 2 o 3 frases sobre UNA sola prediccion, la que viene en
+`gancho`. Sus datos completos estan en `partido_del_gancho`.
+
+Longitud: entre 180 y 260 caracteres.
+
+QUE HACE ATREVIDA ESA PREDICCION. El gancho senala al equipo que NO
+pasa la criba y al que EGO le da opciones contra uno que SI la pasa. Ese
+es el conflicto: la criba lo descarta y la prediccion no lo entierra.
+Si `gancho.motivo` es "descartado_con_opciones", ese es el angulo.
+
+Si el motivo es "lejos_de_la_media_de_la_liga", no hubo ningun choque
+directo esta jornada y el angulo es otro: EGO se aleja de lo que diria
+cualquiera.
+
+Las probabilidades son porcentajes enteros y suman 100 (o 99 o 101 por
+redondeo, y eso no se menciona). `todos_los_partidos` esta ahi solo
+para que sepas el contexto de la jornada: NO lo enumeres.
+
+Cada borrador ataca desde un angulo distinto: la cifra en seco, el
+contraste entre lo que dice la criba y lo que dice la prediccion, lo
+que el resultado significaria, o la voz de la cuenta senalando que EGO
+se esta mojando.""",
+
+    "F3": """FORMATO OBJETIVO: F3 - EL PUNTO CIEGO (jueves o viernes).
+
+El partido de la jornada donde EGO tiene mas incertidumbre. Es el
+formato mas pequeno del proyecto y eso es deliberado.
+
+Estructura: 2 o 3 frases. Va sin imagen o con una muy simple, asi que
+el texto lleva las tres probabilidades.
+
+Longitud: entre 140 y 220 caracteres. MAS CORTO que los demas.
+
+EL ANGULO ES LA HUMILDAD, no el partido. Lo interesante no es que
+juegue el Getafe: es que EGO, que dictamina sin pestanear el resto de
+la semana, aqui no sabe. Es lo mas cerca que va a estar de encogerse de
+hombros.
+
+La entropia es una medida de incertidumbre: cuanto mas alta, menos sabe
+el modelo. El maximo es 1.585, tres opciones exactamente iguales. NO
+uses la palabra "entropia" en el post sin traducirla, y en general es
+mejor no usarla: di que las tres probabilidades estan casi igualadas.
+
+EGO no se disculpa por no saber. Lo constata. La voz de la cuenta puede
+disfrutar del momento.
+
+Cada borrador ataca desde un angulo distinto: las tres cifras en seco,
+lo que significa que esten tan juntas, el contraste con la seguridad
+del resto de la semana, o la segunda voz senalando que EGO ha admitido
+algo por una vez.""",
+
+    "F4": """FORMATO OBJETIVO: F4 - EL DESAFIO (viernes).
+
+Una encuesta nativa de X sobre UN partido. El publico vota y el lunes
+se compara su criterio con el de EGO.
+
+Estructura: 1 o 2 frases que presenten el partido y pidan el voto. La
+encuesta va aparte, con las tres opciones (local / empate / visitante).
+
+Longitud: entre 100 y 180 caracteres. Es el formato mas corto.
+
+NO TIENES LAS PROBABILIDADES DE EGO, y es a proposito: el publico vota
+antes de saber que dice el modelo. No especules sobre quien es favorito,
+no insinues un resultado, no digas que EGO "lo tiene claro" ni que
+"duda". No lo sabes.
+
+El tono es de desafio, no de consulta. No preguntas una opinion:
+propones un duelo. El lunes uno de los dos queda retratado.
+
+Cada borrador ataca desde un angulo distinto: el reto directo, la
+apuesta de que el publico acertara mas, la advertencia de que el lunes
+hay comparacion, o la voz de la cuenta poniendose del lado del publico
+contra EGO.""",
 
     "F5_pasa": _F5_COMUN + """
 
@@ -286,8 +448,7 @@ def numeros_sospechosos(texto: str, datos: dict) -> list[str]:
     Cifras del borrador que no aparecen en el recorte del JSON.
 
     NO son necesariamente errores: "7 de 20 equipos" marca el 20, que es
-    legitimo. Por eso se senalan y las lee el humano, en vez de
-    descartarse solas.
+    legitimo. Por eso se senalan y las lee el humano.
     """
     permitidos = _numeros_del_json(datos)
     fuera = []
@@ -302,8 +463,14 @@ def numeros_sospechosos(texto: str, datos: dict) -> list[str]:
 
 
 def _ultimo_json(tipo: str) -> dict:
+    """
+    El JSON mas reciente de ese tipo. Los de simulacion (_SIM) se
+    descartan: no son predicciones reales y no se publican.
+    """
     patron = f"*_{tipo}.json"
-    ficheros = sorted(PREDICCIONES.glob(patron))
+    ficheros = sorted(
+        p for p in PREDICCIONES.glob(patron) if "_SIM" not in p.name
+    )
     if not ficheros:
         modulo = (
             "src.content.jornada_json" if tipo == "prediccion"
@@ -337,6 +504,17 @@ def generar(formato: str = "F1", doc: dict | None = None) -> list[dict]:
         doc = _ultimo_json(FUENTE[formato])
 
     datos = RECORTES[formato](doc)
+
+    # Un formato sin su gancho no se puede escribir. Pasa si la jornada
+    # no tenia candidatos: mejor parar que inventar.
+    if formato in ("F2", "F3", "F4") and not datos.get("partido"):
+        if formato == "F2" and datos.get("partido_del_gancho"):
+            pass
+        elif formato != "F2":
+            raise SystemExit(
+                f"El JSON no trae gancho para {formato}. Nada que escribir."
+            )
+
     clave = _clave_instruccion(formato, datos)
 
     if clave != formato:
@@ -347,8 +525,7 @@ def generar(formato: str = "F1", doc: dict | None = None) -> list[dict]:
         model=MODELO,
         max_tokens=MAX_TOKENS,
         # Sin razonamiento extendido. Escribir cinco tuits con la guia
-        # delante y el gancho ya elegido por el pipeline no lo necesita,
-        # y ese bloque se comia los 4000 tokens antes de escribir nada.
+        # delante y el gancho ya elegido por el pipeline no lo necesita.
         thinking={"type": "disabled"},
         system=_sistema(),
         messages=[{"role": "user", "content": _usuario(clave, datos)}],
@@ -360,8 +537,7 @@ def generar(formato: str = "F1", doc: dict | None = None) -> list[dict]:
     if respuesta.stop_reason == "max_tokens":
         raise RuntimeError(
             f"La respuesta se corto por limite de tokens ({MAX_TOKENS}). "
-            f"Antes de subirlo, comprueba que `thinking` sigue desactivado: "
-            f"el razonamiento extendido es lo que disparaba la salida."
+            f"Comprueba que `thinking` sigue desactivado."
         )
 
     bruto = "".join(
