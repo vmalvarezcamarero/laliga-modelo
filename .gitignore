@@ -2,7 +2,7 @@
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
-data/raw/
+git add data/raw/
 outputs/charts/
 .DS_Store
 

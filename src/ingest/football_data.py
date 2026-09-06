@@ -189,6 +189,16 @@ def main() -> None:
             f"menos {MINIMO_TEMPORADAS}. No se escribe nada en la base."
         )
 
+    # La temporada en curso no es opcional: es la que se predice. Si
+    # falta, el resto del pipeline no tiene sentido y es mejor parar
+    # aqui que generar un dictamen vacio el miercoles.
+    etiqueta_actual = etiqueta_temporada(ULTIMA_TEMPORADA)
+    if not any(t["temporada"].iloc[0] == etiqueta_actual for t in tablas):
+        raise SystemExit(
+            f"\nFalta la temporada en curso ({etiqueta_actual}). "
+            f"No se escribe nada en la base."
+        )
+
     partidos = pd.concat(tablas, ignore_index=True)
     partidos = partidos.sort_values("fecha").reset_index(drop=True)
 
