@@ -5,6 +5,20 @@ Los 20 equipos ordenados por fuerza, con la linea de corte marcada.
 Quien pasa y quien no. Es el formato insignia de los jueves
 (02_VOZ_Y_FORMATOS §5).
 
+DE DONDE SALEN LOS NUMEROS
+--------------------------
+Del JSON de la semana (outputs/predictions/*_prediccion.json), NO de un
+calculo propio.
+
+La version anterior ajustaba el modelo por su cuenta con una temporada
+y jornada fijas en `main()`. Eso producia dos problemas: el grafico
+dibujaba una jornada distinta de la que decia el texto, y los nombres
+salian en canonico (`Ath Bilbao`, `Vallecano`) porque se saltaba la
+traduccion del ultimo metro (D-30).
+
+Leyendo el JSON, el numero del grafico y el del post son el mismo por
+construccion, y los nombres vienen ya publicables.
+
 Decisiones de diseno
 --------------------
 1. Dos lineas de referencia, no una. El ambar marca el umbral. Una linea
@@ -33,11 +47,15 @@ Uso:
     python -m src.content.grafico_criba
 """
 
+import json
 import sqlite3
+import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from src.content import estilo
 from src.models import dixon_coles
@@ -45,6 +63,7 @@ from src.models.criba import UMBRAL, XI, asignar_jornadas
 
 RAIZ = Path(__file__).resolve().parents[2]
 BD = RAIZ / "data" / "laliga.db"
+PREDICCIONES = RAIZ / "outputs" / "predictions"
 
 # Por debajo de esto, un equipo no recibe numero: recibe "sin datos".
 MIN_PARTIDOS = 10
@@ -148,8 +167,48 @@ def dibujar(
     return fig
 
 
+def desde_json(ruta: Path | None = None) -> tuple[pd.DataFrame, list[str], dict]:
+    """
+    Lee el JSON de la semana y devuelve lo que necesita `dibujar()`.
+
+    Los nombres vienen ya publicables: la traduccion la hizo
+    `jornada_json.py` en el ultimo metro (D-30).
+    """
+    if ruta is None:
+        # Los ficheros de simulacion llevan _SIM y no se dibujan: no son
+        # predicciones reales.
+        candidatos = sorted(
+            p for p in PREDICCIONES.glob("*_prediccion.json")
+            if "_SIM" not in p.name
+        )
+        if not candidatos:
+            raise SystemExit(
+                f"No hay ningun *_prediccion.json en {PREDICCIONES}.\n"
+                f"Ejecuta antes: python -m src.content.jornada_json"
+            )
+        ruta = candidatos[-1]
+
+    doc = json.loads(ruta.read_text(encoding="utf-8"))
+    criba = doc["criba"]
+
+    filas = criba["pasan"] + criba["no_pasan"]
+    tabla = pd.DataFrame(
+        [{"equipo": e["equipo"], "fuerza": e["fuerza"]} for e in filas]
+    ).sort_values("fuerza", ascending=False).reset_index(drop=True)
+
+    sin_datos = [e["equipo"] for e in criba["sin_datos"]]
+
+    return tabla, sin_datos, doc
+
+
 def _tabla_de_una_jornada(temporada: str, jornada: int):
-    """Ajusta el modelo con datos anteriores a esa jornada y devuelve la tabla."""
+    """
+    Ajusta el modelo con datos anteriores a esa jornada y devuelve la
+    tabla. NO se usa para publicar: queda como herramienta para
+    reconstruir cribas historicas sin generar un JSON.
+
+    OJO: devuelve nombres CANONICOS, no publicables.
+    """
     con = sqlite3.connect(BD)
     partidos = pd.read_sql("SELECT * FROM matches", con, parse_dates=["fecha"])
     con.close()
@@ -186,21 +245,27 @@ def _tabla_de_una_jornada(temporada: str, jornada: int):
 def main() -> None:
     estilo.aplicar()
 
-    temporada, jornada = "2025-26", 38
-    tabla, sin_datos = _tabla_de_una_jornada(temporada, jornada)
+    tabla, sin_datos, doc = desde_json()
 
-    fig = dibujar(
-        tabla,
-        f"Jornada {jornada}  ·  {temporada}",
-        sin_datos=sin_datos,
-    )
+    temporada = doc["temporada"]
+    jornada = doc["jornada_etiqueta"]
+    umbral = doc["criba"]["umbral"]
 
-    destino = estilo.guardar(fig, f"criba_{temporada}_j{jornada}.png")
+    subtitulo = f"Jornada {jornada}  ·  {temporada}"
+    if doc.get("semana_mezclada"):
+        subtitulo += "  ·  semana mezclada"
+
+    fig = dibujar(tabla, subtitulo, umbral=umbral, sin_datos=sin_datos)
+
+    destino = estilo.guardar(fig, f"criba_{temporada}_j{jornada:02d}.png")
     plt.close(fig)
 
-    print(f"Guardado en {destino}")
+    print(f"Jornada {jornada} de {temporada}")
+    print(f"Pasan {doc['criba']['resumen']['n_pasan']} de "
+          f"{len(tabla) + len(sin_datos)}")
     if sin_datos:
         print(f"Sin datos suficientes: {', '.join(sin_datos)}")
+    print(f"\nGuardado en {destino}")
 
 
 if __name__ == "__main__":
