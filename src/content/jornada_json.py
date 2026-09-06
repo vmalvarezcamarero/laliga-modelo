@@ -466,7 +466,12 @@ def generar(
 
     if escribir:
         SALIDA.mkdir(parents=True, exist_ok=True)
-        nombre = f"{temporada}_J{semana.jornada_etiqueta:02d}_prediccion.json"
+        # Los ficheros de simulacion llevan _SIM y estan en .gitignore.
+        # `outputs/predictions/` es el registro publico de lo que EGO
+        # dictamino de verdad: un JSON reconstruido a posteriori no
+        # puede acabar ahi por descuido (D-26).
+        marca = "_SIM" if simular else ""
+        nombre = f"{temporada}_J{semana.jornada_etiqueta:02d}{marca}_prediccion.json"
         ruta = SALIDA / nombre
         ruta.write_text(
             json.dumps(documento, ensure_ascii=False, indent=2), encoding="utf-8"

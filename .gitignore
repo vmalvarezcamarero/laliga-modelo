@@ -11,3 +11,5 @@ criba_*.txt
 outputs/borradores/
 
 outputs/calibracion/
+
+outputs/predictions/*_SIM_*.json

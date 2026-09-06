@@ -260,8 +260,11 @@ def generar(referencia: datetime | None = None, escribir: bool = True) -> dict:
 
     if escribir:
         SALIDA.mkdir(parents=True, exist_ok=True)
+                # Si la prediccion era una simulacion, la auditoria tambien lo
+        # es: hereda la marca para que no acabe en el repo.
+        marca = "_SIM" if "_SIM" in ruta.name else ""
         nombre = (f"{temporada}_J{prediccion['jornada_etiqueta']:02d}"
-                  f"_auditoria.json")
+                  f"{marca}_auditoria.json")
         destino = SALIDA / nombre
         destino.write_text(
             json.dumps(documento, ensure_ascii=False, indent=2), encoding="utf-8"
