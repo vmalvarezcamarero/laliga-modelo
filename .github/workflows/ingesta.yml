@@ -1,0 +1,48 @@
+name: Ingesta
+
+# Martes 09:00 y domingo 23:30, hora de Madrid (UTC+1 en invierno).
+# GitHub Actions usa UTC, asi que en horario de verano corre una hora
+# antes. Es aceptable: ningun job depende de la hora exacta.
+on:
+  schedule:
+    - cron: "0 8 * * 2"    # martes
+    - cron: "30 22 * * 0"  # domingo
+  workflow_dispatch:        # permite lanzarlo a mano desde la web
+
+jobs:
+  ingerir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install pandas numpy scipy soccerdata matplotlib requests tzdata anthropic
+
+      - name: Resultados de Football-Data
+        run: python -m src.ingest.football_data
+
+      - name: xG de Understat
+        run: python -m src.ingest.understat
+
+      - name: Cuotas de cierre (tabla separada, D-14)
+        run: python -m src.ingest.odds
+
+      - name: Calendario
+        env:
+          FOOTBALL_DATA_KEY: ${{ secrets.FOOTBALL_DATA_KEY }}
+        run: python -m src.ingest.fixtures
+
+      - name: Guardar en el repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/laliga.db
+          git diff --staged --quiet || git commit -m "Ingesta automatica"
+          git pull --rebase
+          git push

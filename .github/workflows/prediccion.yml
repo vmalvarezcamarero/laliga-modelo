@@ -1,0 +1,44 @@
+name: Prediccion
+
+# Miercoles 09:00. Es el inicio de la ventana de la semana (D-28).
+on:
+  schedule:
+    - cron: "0 8 * * 3"
+  workflow_dispatch:
+
+jobs:
+  predecir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install pandas numpy scipy soccerdata matplotlib requests tzdata anthropic
+
+      # La maquina de GitHub no trae JetBrains Mono. Sin ella los
+      # graficos salen con otra tipografia y la identidad visual (D-21)
+      # se rompe sin que nadie lo note.
+      - name: Instalar JetBrains Mono
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y fonts-jetbrains-mono
+          rm -f ~/.cache/matplotlib/fontlist-*.json
+
+      - name: JSON de la semana
+        run: python -m src.content.jornada_json
+
+      - name: Guardar en el repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add outputs/predictions/
+          git diff --staged --quiet || git commit -m "Prediccion de la semana"
+          git pull --rebase
+          git push
+          

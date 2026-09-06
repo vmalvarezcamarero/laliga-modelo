@@ -1,0 +1,31 @@
+name: Borradores
+
+# Jueves 18:00. Genera F1 y espera a que el humano elija en Telegram.
+on:
+  schedule:
+    - cron: "0 17 * * 4"
+  workflow_dispatch:
+
+jobs:
+  redactar:
+    runs-on: ubuntu-latest
+    # 25 minutos: 20 de espera en Telegram mas margen. Si se cuelga,
+    # GitHub lo mata en vez de dejarlo corriendo.
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install pandas numpy scipy requests tzdata anthropic
+
+      - name: Borradores de F1 a Telegram
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python -m src.deliver.telegram F1
