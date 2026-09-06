@@ -34,7 +34,7 @@ from src.models.criba import asignar_jornadas
 
 RAIZ = Path(__file__).resolve().parents[2]
 BD = RAIZ / "data" / "laliga.db"
-FUERZAS = RAIZ / "outputs" / "predictions" / "fuerzas_historico.csv"
+FUERZAS = RAIZ / "outputs" / "calibracion" / "fuerzas_historico.csv"
 
 UMBRALES = np.round(np.arange(1.00, 1.62, 0.02), 2)
 
