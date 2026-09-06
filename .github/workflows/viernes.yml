@@ -1,16 +1,16 @@
-name: Borradores del jueves
+name: Borradores del viernes
 
-# Jueves 18:00. F1 (la criba) y F2 (el dictamen), que se publican
-# juntos: son la misma sesion editorial.
+# Viernes 10:00. F3 (el punto ciego) y F4 (el desafio), los dos
+# formatos cortos. F4 lleva encuesta nativa de X: el humano la crea a
+# mano al publicar, con las tres opciones 1 / X / 2.
 on:
   schedule:
-    - cron: "0 17 * * 4"
+    - cron: "0 9 * * 5"
   workflow_dispatch:
 
 jobs:
   redactar:
     runs-on: ubuntu-latest
-    # Dos formatos, dos esperas de 20 minutos, mas margen de sobra.
     timeout-minutes: 50
 
     steps:
@@ -23,12 +23,9 @@ jobs:
       - name: Instalar dependencias
         run: pip install -r requirements.txt
 
-      # OJO: un bot de Telegram con polling solo admite UN consumidor.
-      # No lanzar el script en local mientras este job espera, o se
-      # roban los mensajes entre si (P-16).
-      - name: F1 y F2 a Telegram
+      - name: F3 y F4 a Telegram
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python -m src.deliver.telegram F1 F2
+        run: python -m src.deliver.telegram F3 F4

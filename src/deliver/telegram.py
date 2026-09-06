@@ -227,12 +227,26 @@ def repartir(formato: str) -> dict | None:
 
 
 if __name__ == "__main__":
-    formato = sys.argv[1] if len(sys.argv) > 1 else "F1"
+    formatos = sys.argv[1:] or ["F1"]
 
-    if formato not in FUENTE:
+    desconocidos = [f for f in formatos if f not in FUENTE]
+    if desconocidos:
         raise SystemExit(
-            f"Formato desconocido: {formato}. "
+            f"Formato(s) desconocido(s): {', '.join(desconocidos)}. "
             f"Disponibles: {sorted(FUENTE)}"
         )
 
-    repartir(formato)
+    # Varios formatos en una sola ejecucion: el jueves van F1 y F2, el
+    # viernes F3 y F4. Se reparten en serie porque un bot con polling
+    # solo admite un consumidor (P-16): dos procesos a la vez se roban
+    # los mensajes.
+    for i, formato in enumerate(formatos):
+        if i:
+            print()
+        try:
+            repartir(formato)
+        except Exception as e:
+            # Que falle uno no puede impedir que se entreguen los
+            # demas. Un jueves sin F2 es peor que un jueves sin nada.
+            print(f"ERROR en {formato}: {e}")
+            enviar(f"No se ha podido generar {formato}: {e}")
