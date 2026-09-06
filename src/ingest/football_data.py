@@ -3,10 +3,29 @@ Ingesta de Football-Data.co.uk para LaLiga (SP1).
 
 Descarga los CSV historicos, los normaliza y los guarda en SQLite.
 Los CSV crudos se conservan en data/raw/ para no depender de la red
-si hay que reprocesar.
+si hay que reprocesar. `data/raw/` NO se versiona, asi que en un runner
+de GitHub Actions siempre se descarga todo desde cero.
+
+TRES COSAS APRENDIDAS EN EL PRIMER CRON:
+
+1. La temporada EN CURSO se vuelve a descargar siempre. La cache por
+   "si el fichero existe, no lo bajo" es correcta para el historico,
+   que no cambia, y desastrosa para la temporada viva: el cron del
+   martes no traeria nunca un resultado nuevo.
+
+2. Sin cabecera de navegador, football-data.co.uk puede rechazar la
+   peticion. Es una web pequena con proteccion basica y `requests` sin
+   User-Agent se identifica como un script. El CSV es publico y de
+   descarga libre; esto no evade nada, solo se presenta.
+
+3. Si no se descarga nada, el script MUERE con codigo de error. Antes
+   hacia `return` y terminaba limpiamente: GitHub marcaba el paso como
+   correcto y el fallo aparecia tres pasos despues, en otro modulo.
+   Un cron que "termina bien" sin hacer nada es peor que uno que falla.
 """
 
 import sqlite3
+import sys
 import time
 from pathlib import Path
 
@@ -19,6 +38,17 @@ PRIMERA_TEMPORADA = 2014   # 2014-15, inicio de cobertura de Understat
 ULTIMA_TEMPORADA = 2026    # 2026-27, temporada en curso
 
 URL_BASE = "https://www.football-data.co.uk/mmz4281/{codigo}/SP1.csv"
+
+CABECERAS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+    )
+}
+
+# Minimo de temporadas para dar la ingesta por buena. Si se descargan
+# menos, algo va mal aunque tecnicamente haya datos.
+MINIMO_TEMPORADAS = 10
 
 # La raiz del proyecto son dos niveles por encima de este archivo:
 # src/ingest/football_data.py -> src/ingest -> src -> laliga-modelo
@@ -62,28 +92,52 @@ def etiqueta_temporada(anio: int) -> str:
 
 def descargar(anio: int) -> Path | None:
     """
-    Descarga el CSV de una temporada si no lo tenemos ya.
-    Devuelve la ruta al archivo, o None si no se pudo descargar.
+    Descarga el CSV de una temporada. Devuelve la ruta, o None si falla.
+
+    Las temporadas cerradas se cachean; la temporada EN CURSO se intenta
+    descargar siempre, porque cambia cada fin de semana.
+
+    SI LA DESCARGA FALLA Y HAY COPIA LOCAL, SE USA LA COPIA. Un 503 del
+    servidor no puede hacer que una temporada entera desaparezca de la
+    base: es un fallo temporal de un tercero y el dato de la semana
+    pasada sigue siendo valido.
     """
     codigo = codigo_temporada(anio)
     destino = DIR_RAW / f"SP1_{codigo}.csv"
+    en_curso = anio == ULTIMA_TEMPORADA
 
-    if destino.exists():
+    if destino.exists() and not en_curso:
         print(f"  {etiqueta_temporada(anio)}: ya descargado")
         return destino
 
     url = URL_BASE.format(codigo=codigo)
+    fallo = None
     try:
-        respuesta = requests.get(url, timeout=30)
+        respuesta = requests.get(url, headers=CABECERAS, timeout=30)
         respuesta.raise_for_status()
+        # Una web puede devolver una pagina de error con codigo 200.
+        # Sin esto se guardaria HTML como si fueran datos.
+        if not respuesta.content.startswith(b"Div,"):
+            fallo = f"la respuesta no parece un CSV ({len(respuesta.content)} bytes)"
+        else:
+            destino.write_bytes(respuesta.content)
+            sufijo = " (en curso)" if en_curso else ""
+            print(
+                f"  {etiqueta_temporada(anio)}: descargado "
+                f"({len(respuesta.content) // 1024} KB){sufijo}"
+            )
+            time.sleep(1)  # cortesia con el servidor
+            return destino
     except requests.RequestException as error:
-        print(f"  {etiqueta_temporada(anio)}: NO disponible ({error})")
-        return None
+        fallo = str(error)
 
-    destino.write_bytes(respuesta.content)
-    print(f"  {etiqueta_temporada(anio)}: descargado ({len(respuesta.content) // 1024} KB)")
-    time.sleep(1)  # cortesia con el servidor
-    return destino
+    if destino.exists():
+        print(f"  {etiqueta_temporada(anio)}: fallo la descarga ({fallo}). "
+              f"Se usa la copia local.")
+        return destino
+
+    print(f"  {etiqueta_temporada(anio)}: NO disponible ({fallo})")
+    return None
 
 
 def leer_y_normalizar(ruta: Path, anio: int) -> pd.DataFrame | None:
@@ -126,9 +180,14 @@ def main() -> None:
         if df is not None and not df.empty:
             tablas.append(df)
 
-    if not tablas:
-        print("\nNo se ha podido descargar ninguna temporada. Abortando.")
-        return
+    # Muere con codigo de error, no con un return limpio. Un cron que
+    # termina bien sin hacer nada es un fallo invisible.
+    if len(tablas) < MINIMO_TEMPORADAS:
+        raise SystemExit(
+            f"\nSolo se han obtenido {len(tablas)} temporadas de "
+            f"{ULTIMA_TEMPORADA - PRIMERA_TEMPORADA + 1}. Se esperaban al "
+            f"menos {MINIMO_TEMPORADAS}. No se escribe nada en la base."
+        )
 
     partidos = pd.concat(tablas, ignore_index=True)
     partidos = partidos.sort_values("fecha").reset_index(drop=True)
@@ -141,7 +200,9 @@ def main() -> None:
     print("\nPartidos por temporada:")
     conteo = partidos.groupby("temporada").size()
     for temporada, n in conteo.items():
-        marca = "" if n == 380 else "  <-- revisar"
+        # La temporada en curso tiene menos, y eso es correcto.
+        esperado = n == 380 or temporada == etiqueta_temporada(ULTIMA_TEMPORADA)
+        marca = "" if esperado else "  <-- revisar"
         print(f"  {temporada}: {n}{marca}")
 
     print(f"\nTotal: {len(partidos)} partidos guardados en {RUTA_DB}")
