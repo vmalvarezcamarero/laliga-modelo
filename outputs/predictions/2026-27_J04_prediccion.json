@@ -1,6 +1,6 @@
 {
   "version_esquema": 1,
-  "generado": "2026-09-05T16:55:38.514944+02:00",
+  "generado": "2026-09-06T01:05:18.768412+00:00",
   "temporada": "2026-27",
   "jornada_etiqueta": 4,
   "semana_mezclada": false,
@@ -165,96 +165,6 @@
     }
   },
   "partidos": [
-    {
-      "id": "J4_AthBilbao_AthMadrid",
-      "jornada": 4,
-      "local": "Athletic",
-      "visitante": "Atlético",
-      "fecha": "2026-09-05T16:15:00+02:00",
-      "prob": {
-        "local": 41,
-        "empate": 26,
-        "visitante": 32
-      },
-      "marcador_probable": "1-1",
-      "entropia": 1.56,
-      "mas_25_goles": 48,
-      "ambos_marcan": 53,
-      "criba": {
-        "local": true,
-        "visitante": true,
-        "choque_directo": false
-      },
-      "fiabilidad": "completa",
-      "corners": {
-        "local": 5.8,
-        "visitante": 4.1
-      },
-      "tarjetas": {
-        "local": 1.8,
-        "visitante": 2.2
-      }
-    },
-    {
-      "id": "J4_Vallecano_Santander",
-      "jornada": 4,
-      "local": "Rayo",
-      "visitante": "Racing",
-      "fecha": "2026-09-05T18:30:00+02:00",
-      "prob": {
-        "local": 45,
-        "empate": 25,
-        "visitante": 30
-      },
-      "marcador_probable": "1-1",
-      "entropia": 1.543,
-      "mas_25_goles": 51,
-      "ambos_marcan": 54,
-      "criba": {
-        "local": false,
-        "visitante": false,
-        "choque_directo": false
-      },
-      "fiabilidad": "parcial",
-      "corners": {
-        "local": 7.9,
-        "visitante": 4.4
-      },
-      "tarjetas": {
-        "local": 2.3,
-        "visitante": 2.5
-      }
-    },
-    {
-      "id": "J4_Villarreal_LaCoruna",
-      "jornada": 4,
-      "local": "Villarreal",
-      "visitante": "Dépor",
-      "fecha": "2026-09-05T21:00:00+02:00",
-      "prob": {
-        "local": 67,
-        "empate": 19,
-        "visitante": 14
-      },
-      "marcador_probable": "2-0",
-      "entropia": 1.23,
-      "mas_25_goles": 59,
-      "ambos_marcan": 52,
-      "criba": {
-        "local": true,
-        "visitante": false,
-        "choque_directo": true
-      },
-      "fiabilidad": "completa",
-      "corners": {
-        "local": 6.5,
-        "visitante": 4.1
-      },
-      "tarjetas": {
-        "local": 1.8,
-        "visitante": 2.7
-      }
-    },
     {
       "id": "J4_Valencia_Barcelona",
       "jornada": 4,
@@ -500,6 +410,6 @@
     }
   },
   "advertencias": [
-    "2 partido(s) ya disputados pero sin resultado en `matches` (Sociedad-Celta, Betis-Real Madrid). Ni se predicen ni se auditan: falta ingesta."
+    "5 partido(s) ya disputados pero sin resultado en `matches` (Sociedad-Celta, Betis-Real Madrid, Ath Bilbao-Ath Madrid, Vallecano-Santander, Villarreal-La Coruna). Ni se predicen ni se auditan: falta ingesta."
   ]
 }
