@@ -9,6 +9,10 @@ Cuatro grafías conviven en el proyecto:
 REGLA: dentro del sistema todo habla en canónico.
 Si un nombre no está aquí, el script que lo pida se detiene.
 Traducir mal es peor que no traducir.
+
+Este fichero es la ÚNICA fuente de verdad de los nombres. Dos copias del
+mismo diccionario acaban divergiendo, y el día que añadas un equipo a una
+y no a la otra, una ingesta se para sin motivo aparente.
 """
 
 
@@ -48,6 +52,44 @@ FDORG_A_CANONICO = {
     "SD Eibar": "Eibar",
     "Real Sporting de Gijón": "Sp Gijon",
     "Córdoba CF": "Cordoba",
+}
+
+
+# Understat -> canónico (Football-Data.co.uk)
+UNDERSTAT_A_CANONICO = {
+    "Alaves": "Alaves",
+    "Almeria": "Almeria",
+    "Athletic Club": "Ath Bilbao",
+    "Atletico Madrid": "Ath Madrid",
+    "Barcelona": "Barcelona",
+    "Cadiz": "Cadiz",
+    "Celta Vigo": "Celta",
+    "Cordoba": "Cordoba",
+    "Deportivo La Coruna": "La Coruna",
+    "Eibar": "Eibar",
+    "Elche": "Elche",
+    "Espanyol": "Espanol",
+    "Getafe": "Getafe",
+    "Girona": "Girona",
+    "Granada": "Granada",
+    "SD Huesca": "Huesca",
+    "Las Palmas": "Las Palmas",
+    "Leganes": "Leganes",
+    "Levante": "Levante",
+    "Malaga": "Malaga",
+    "Mallorca": "Mallorca",
+    "Osasuna": "Osasuna",
+    "Racing Santander": "Santander",
+    "Rayo Vallecano": "Vallecano",
+    "Real Betis": "Betis",
+    "Real Madrid": "Real Madrid",
+    "Real Oviedo": "Oviedo",
+    "Real Sociedad": "Sociedad",
+    "Real Valladolid": "Valladolid",
+    "Sevilla": "Sevilla",
+    "Sporting Gijon": "Sp Gijon",
+    "Valencia": "Valencia",
+    "Villarreal": "Villarreal",
 }
 
 
@@ -95,7 +137,10 @@ class NombreDesconocido(Exception):
 
 def a_canonico(nombre: str, fuente: str = "fdorg") -> str:
     """Traduce un nombre de una fuente externa al canónico interno."""
-    tablas = {"fdorg": FDORG_A_CANONICO}
+    tablas = {
+        "fdorg": FDORG_A_CANONICO,
+        "understat": UNDERSTAT_A_CANONICO,
+    }
     if fuente not in tablas:
         raise ValueError(f"Fuente no reconocida: {fuente}")
     tabla = tablas[fuente]

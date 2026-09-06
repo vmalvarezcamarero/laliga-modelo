@@ -8,14 +8,30 @@ El cruce entre fuentes se hace por fecha + equipos. No hay identificador
 comun, solo el nombre, y cada fuente escribe los nombres a su manera.
 Por eso el script VALIDA el cruce y se detiene si no cuadra, en lugar
 de perder partidos en silencio.
+
+IDEMPOTENCIA. Este script se ejecuta desde un cron cada martes y cada
+domingo, asi que tiene que dar el mismo resultado la vez 1 y la vez 50.
+La primera version no lo era: al volver a ejecutarse sobre una tabla
+`matches` que YA tenia columnas de xG, el merge las renombraba a
+`xg_local_x` y `xg_local_y` y todo lo posterior fallaba con
+`KeyError: 'xg_local'`. Se descartan antes de cruzar: el xG siempre
+viene de Understat, las que hubiera en la base son de una ejecucion
+anterior.
+
+El diccionario de nombres vive en `src/models/equipos.py` (D-30).
 """
 
 import sqlite3
+import sys
 import time
 from pathlib import Path
 
 import pandas as pd
 import soccerdata as sd
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from src.models.equipos import UNDERSTAT_A_CANONICO
 
 # --- Configuracion -------------------------------------------------
 
@@ -28,43 +44,7 @@ UMBRAL_CRUCE = 0.99
 RAIZ = Path(__file__).resolve().parents[2]
 RUTA_DB = RAIZ / "data" / "laliga.db"
 
-# Understat -> Football-Data.
-# Football-Data usa abreviaturas; Understat, nombres largos.
-EQUIVALENCIAS = {
-    "Alaves": "Alaves",
-    "Almeria": "Almeria",
-    "Athletic Club": "Ath Bilbao",
-    "Atletico Madrid": "Ath Madrid",
-    "Barcelona": "Barcelona",
-    "Cadiz": "Cadiz",
-    "Celta Vigo": "Celta",
-    "Cordoba": "Cordoba",
-    "Deportivo La Coruna": "La Coruna",
-    "Eibar": "Eibar",
-    "Elche": "Elche",
-    "Espanyol": "Espanol",
-    "Getafe": "Getafe",
-    "Girona": "Girona",
-    "Granada": "Granada",
-    "SD Huesca": "Huesca",
-    "Las Palmas": "Las Palmas",
-    "Leganes": "Leganes",
-    "Levante": "Levante",
-    "Malaga": "Malaga",
-    "Mallorca": "Mallorca",
-    "Osasuna": "Osasuna",
-    "Racing Santander": "Santander",
-    "Rayo Vallecano": "Vallecano",
-    "Real Betis": "Betis",
-    "Real Madrid": "Real Madrid",
-    "Real Oviedo": "Oviedo",
-    "Real Sociedad": "Sociedad",
-    "Real Valladolid": "Valladolid",
-    "Sevilla": "Sevilla",
-    "Sporting Gijon": "Sp Gijon",
-    "Valencia": "Valencia",
-    "Villarreal": "Villarreal",
-}
+COLUMNAS_XG = ["xg_local", "xg_visitante"]
 
 
 def codigo_temporada(anio: int) -> str:
@@ -101,24 +81,25 @@ def descargar_temporadas() -> pd.DataFrame:
 
 def traducir_nombres(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Traduce los nombres de Understat a los de Football-Data.
+    Traduce los nombres de Understat al canonico interno.
     Si aparece un nombre que no esta en el diccionario, se detiene:
     traducirlo mal es peor que no traducirlo.
     """
     nombres = set(df["home_team"]) | set(df["away_team"])
-    desconocidos = sorted(nombres - set(EQUIVALENCIAS))
+    desconocidos = sorted(nombres - set(UNDERSTAT_A_CANONICO))
 
     if desconocidos:
         print("\nNombres de Understat sin equivalencia definida:")
         for nombre in desconocidos:
             print(f"  - {nombre}")
         raise SystemExit(
-            "\nAnade estos nombres al diccionario EQUIVALENCIAS y vuelve a ejecutar."
+            "\nAnade estos nombres a UNDERSTAT_A_CANONICO en "
+            "src/models/equipos.py y vuelve a ejecutar."
         )
 
     df = df.copy()
-    df["local"] = df["home_team"].map(EQUIVALENCIAS)
-    df["visitante"] = df["away_team"].map(EQUIVALENCIAS)
+    df["local"] = df["home_team"].map(UNDERSTAT_A_CANONICO)
+    df["visitante"] = df["away_team"].map(UNDERSTAT_A_CANONICO)
     return df
 
 
@@ -141,6 +122,14 @@ def cruzar(partidos: pd.DataFrame, xg: pd.DataFrame) -> pd.DataFrame:
     """
     partidos = partidos.copy()
     partidos["fecha"] = pd.to_datetime(partidos["fecha"]).dt.normalize()
+
+    # Idempotencia: fuera el xG de ejecuciones anteriores. Sin esto, el
+    # merge renombra las columnas a _x/_y y el script solo funciona la
+    # primera vez que se ejecuta en su vida.
+    sobrantes = [c for c in COLUMNAS_XG if c in partidos.columns]
+    if sobrantes:
+        print(f"  Descartando xG de una ejecucion anterior: {sobrantes}")
+        partidos = partidos.drop(columns=sobrantes)
 
     unido = partidos.merge(
         xg, on=["fecha", "local", "visitante"], how="left", validate="one_to_one"
@@ -179,6 +168,13 @@ def main() -> None:
         partidos = pd.read_sql("SELECT * FROM matches", conexion)
 
     print(f"Partidos en la base: {len(partidos)}")
+
+    # Understat suele ir por delante: publica el xG de un partido antes
+    # de que Football-Data lo incluya en su CSV semanal. Esos partidos
+    # entraran en la base en la siguiente ingesta.
+    sobran = len(crudo) - len(partidos)
+    if sobran > 0:
+        print(f"  ({sobran} partidos con xG que Football-Data aun no publica)")
 
     unido = cruzar(partidos, xg)
 
