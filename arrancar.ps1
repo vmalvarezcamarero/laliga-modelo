@@ -8,10 +8,24 @@
 
 $claves = Join-Path $env:USERPROFILE ".laliga-modelo.env"
 
-# 1. Entorno virtual
+# 1. Traer lo que hayan escrito los crons.
+#    Cuatro workflows escriben en el repo cada semana. Sin esto, la
+#    copia local se queda atras y el primer push rebota.
+Write-Host "Sincronizando con GitHub..." -ForegroundColor Cyan
+
+$sucio = git status --porcelain
+if ($sucio) {
+    Write-Host "  Hay cambios locales sin commitear:" -ForegroundColor Yellow
+    git status --short
+    Write-Host "  No se hace pull. Commitealos o guardalos antes." -ForegroundColor Yellow
+} else {
+    git pull --rebase
+}
+
+# 2. Entorno virtual
 & "$PSScriptRoot\.venv\Scripts\Activate.ps1"
 
-# 2. Credenciales
+# 3. Credenciales
 if (-not (Test-Path $claves)) {
     Write-Host "No existe $claves" -ForegroundColor Yellow
     Write-Host "Crealo con este contenido (una por linea, sin comillas):"
@@ -32,7 +46,7 @@ Get-Content $claves | ForEach-Object {
     }
 }
 
-# 3. Comprobacion. Se enseña la longitud, nunca el valor.
+# 4. Comprobacion. Se enseña la longitud, nunca el valor.
 $esperadas = @(
     "FOOTBALL_DATA_KEY",
     "ANTHROPIC_API_KEY",
@@ -56,4 +70,6 @@ Write-Host "  python -m src.ingest.fixtures            calendario"
 Write-Host "  python -m src.content.jornada_json       JSON de la semana"
 Write-Host "  python -m src.evaluate.auditoria         JSON del lunes"
 Write-Host "  python -m src.deliver.telegram F1        borradores a Telegram"
+Write-Host ""
+Write-Host "  OJO: no lances telegram en local si hay un cron esperando (P-16)."
 Write-Host ""

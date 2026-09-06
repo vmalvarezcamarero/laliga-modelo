@@ -39,7 +39,9 @@ from rps import (  # noqa: E402
 )
 
 RUTA_DB = RAIZ / "data" / "laliga.db"
-DIR_SALIDA = RAIZ / "outputs" / "predictions"
+# Artefacto de calibracion, no registro de lo dictaminado.
+# `outputs/predictions/` solo contiene predicciones y auditorias (D-26).
+DIR_SALIDA = RAIZ / "outputs" / "calibracion"
 
 # Partidos minimos antes de empezar a predecir. Dos temporadas.
 MIN_ENTRENAMIENTO = 760

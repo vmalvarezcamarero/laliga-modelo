@@ -37,7 +37,9 @@ from src.models.criba import XI, asignar_jornadas
 
 RAIZ = Path(__file__).resolve().parents[2]
 BD = RAIZ / "data" / "laliga.db"
-SALIDA = RAIZ / "outputs" / "predictions" / "fuerzas_historico.csv"
+# Artefacto de calibracion, no registro de lo dictaminado.
+# `outputs/predictions/` solo contiene predicciones y auditorias (D-26).
+SALIDA = RAIZ / "outputs" / "calibracion" / "fuerzas_historico.csv"
 
 # Las mismas temporadas de validacion del Sprint 1. Calibrar el umbral
 # sobre ellas es legitimo: el umbral no se elige por acierto predictivo,
