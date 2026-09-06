@@ -20,7 +20,7 @@ jobs:
           python-version: "3.12"
 
       - name: Instalar dependencias
-        run: pip install pandas numpy scipy matplotlib requests tzdata anthropic
+        run: pip install -r requirements.txt
 
       - name: Instalar JetBrains Mono
         run: |
@@ -28,6 +28,8 @@ jobs:
           sudo apt-get install -y fonts-jetbrains-mono
           rm -f ~/.cache/matplotlib/fontlist-*.json
 
+      # Solo se audita lo que se publico (D-26): este paso LEE el JSON
+      # de prediccion de la ventana que se cierra, no recalcula nada.
       - name: JSON de auditoria
         run: python -m src.evaluate.auditoria
 

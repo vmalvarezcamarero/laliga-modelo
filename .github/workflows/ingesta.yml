@@ -21,8 +21,12 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Versiones fijadas. Sin esto el runner instala las ultimas de
+      # cada libreria y el cron corre sobre un entorno distinto al de
+      # desarrollo: un martes cualquiera pandas saca version nueva y
+      # algo se rompe sin que nadie haya tocado nada.
       - name: Instalar dependencias
-        run: pip install pandas numpy scipy soccerdata matplotlib requests tzdata anthropic
+        run: pip install -r requirements.txt
 
       - name: Resultados de Football-Data
         run: python -m src.ingest.football_data
@@ -42,7 +46,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/laliga.db
+          git add data/laliga.db data/raw/
           git diff --staged --quiet || git commit -m "Ingesta automatica"
           git pull --rebase
           git push

@@ -19,7 +19,7 @@ jobs:
           python-version: "3.12"
 
       - name: Instalar dependencias
-        run: pip install pandas numpy scipy soccerdata matplotlib requests tzdata anthropic
+        run: pip install -r requirements.txt
 
       # La maquina de GitHub no trae JetBrains Mono. Sin ella los
       # graficos salen con otra tipografia y la identidad visual (D-21)
@@ -41,4 +41,3 @@ jobs:
           git diff --staged --quiet || git commit -m "Prediccion de la semana"
           git pull --rebase
           git push
-          
