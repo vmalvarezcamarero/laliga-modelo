@@ -16,13 +16,20 @@ DOS REGLAS QUE GOBIERNAN ESTE MODULO:
    forma de que el personaje no pueda escaquearse redactando.
 
 EL LISTON (D-31): EGO pasa si bate a las frecuencias base de LaLiga, y
-desde que haya encuestas tambien al publico. Es un AND, no una media:
-si bastara con uno de los dos siempre habria una lectura favorable y el
-lunes perderia tension en dos meses.
+desde que haya encuestas tambien al publico. Es un AND, no una media.
+
+EL BLOQUE `rendimiento`. Ademas de auditar a EGO, este modulo calcula
+quien gano sin merecerlo: goles reales menos xG generado. Alimenta el
+formato del miercoles.
+
+Va aqui y no en un modulo aparte porque el cruce prediccion <-> resultado
+ya se hace en este fichero. Repetirlo en otro sitio serian dos modulos
+emparejando partidos por fecha con tolerancia, y dos sitios que pueden
+desincronizarse. Es el mismo motivo por el que los graficos leen el JSON
+en vez de recalcular (D-47).
 
 NOTA SOBRE rps(): devuelve el RPS de CADA partido, no la media. Se
-agrega aqui con np.mean(). Es la firma correcta: asi el backtest puede
-agregar como quiera.
+agrega aqui con np.mean().
 """
 
 import json
@@ -45,7 +52,7 @@ BASE = Path(__file__).resolve().parents[2]
 DB = BASE / "data" / "laliga.db"
 SALIDA = BASE / "outputs" / "predictions"
 
-VERSION_ESQUEMA = 1
+VERSION_ESQUEMA = 2  # 2: anade el bloque `rendimiento`
 
 
 # --- Datos ----------------------------------------------------------
@@ -55,7 +62,8 @@ def _resultados(hasta: str | None = None) -> pd.DataFrame:
     con = sqlite3.connect(DB)
     try:
         df = pd.read_sql(
-            "SELECT fecha, local, visitante, goles_local, goles_visitante "
+            "SELECT fecha, local, visitante, goles_local, goles_visitante, "
+            "xg_local, xg_visitante "
             "FROM matches WHERE goles_local IS NOT NULL",
             con,
         )
@@ -87,8 +95,7 @@ def _prediccion_de_la_ventana(desde: str) -> tuple[dict, Path]:
 def _frecuencias_base(entrenamiento: pd.DataFrame) -> np.ndarray:
     """
     El liston. Se calcula con los MISMOS datos que uso la prediccion,
-    para que la comparacion sea justa: si EGO entreno hasta el miercoles,
-    el baseline tambien.
+    para que la comparacion sea justa.
     """
     indices = [
         resultado_a_indice(g, v)
@@ -102,10 +109,11 @@ def _frecuencias_base(entrenamiento: pd.DataFrame) -> np.ndarray:
 # --- Cruce prediccion <-> resultado ----------------------------------
 
 
-def _buscar_resultado(
+def _buscar_partido(
     jugados: pd.DataFrame, local: str, visitante: str, fecha: str
-) -> tuple[int, int] | None:
-    """Tolerancia de +-1 dia: `matches.fecha` no trae hora."""
+) -> pd.Series | None:
+    """La fila entera del partido. Tolerancia de +-1 dia: `matches.fecha`
+    no trae hora."""
     dia = pd.Timestamp(fecha).date()
     for delta in (0, -1, 1):
         objetivo = dia + pd.Timedelta(days=delta)
@@ -115,16 +123,14 @@ def _buscar_resultado(
             & (jugados["visitante"] == visitante)
         ]
         if not fila.empty:
-            f = fila.iloc[0]
-            return int(f["goles_local"]), int(f["goles_visitante"])
+            return fila.iloc[0]
     return None
 
 
 def _canonico(publicable: str, jugados: pd.DataFrame) -> str | None:
     """
     El JSON guarda nombres publicables; `matches`, canonicos. Se invierte
-    el diccionario en vez de guardar el canonico en el JSON: lo que sale
-    del pipeline habla en publicable y punto (D-30).
+    el diccionario en vez de guardar el canonico en el JSON (D-30).
     """
     for c in set(jugados["local"]) | set(jugados["visitante"]):
         if a_publicable(c) == publicable:
@@ -135,6 +141,75 @@ def _canonico(publicable: str, jugados: pd.DataFrame) -> str | None:
 def _rps_de_uno(probabilidades: list[float], real: int) -> float:
     """RPS de un solo partido, ya agregado a escalar."""
     return float(np.mean(rps(np.array([probabilidades]), np.array([real]))))
+
+
+# --- Rendimiento: quien gano sin merecerlo ---------------------------
+
+
+def _rendimiento(filas: list[dict]) -> dict:
+    """
+    Goles reales menos xG generado, por equipo y partido.
+
+    Positivo = marco mas de lo que genero. Es la tesis de la cuenta
+    aplicada al pasado: un equipo puede ganar sin merecerlo.
+
+    Los partidos sin xG quedan fuera y se cuentan. Pasa con la temporada
+    en curso cuando Understat va por detras de Football-Data. No se
+    inventa nada.
+    """
+    partidos, sin_xg = [], []
+
+    for f in filas:
+        if f["xg_local"] is None or f["xg_visitante"] is None:
+            sin_xg.append(f"{f['local']} - {f['visitante']}")
+            continue
+
+        gl, gv = f["goles"]
+        xl, xv = f["xg_local"], f["xg_visitante"]
+
+        partidos.append({
+            "id": f["id"],
+            "local": f["local"],
+            "visitante": f["visitante"],
+            "marcador": f["marcador"],
+            "goles": {"local": gl, "visitante": gv},
+            "xg": {"local": round(xl, 2), "visitante": round(xv, 2)},
+            "diferencia": {
+                "local": round(gl - xl, 2),
+                "visitante": round(gv - xv, 2),
+            },
+        })
+
+    if not partidos:
+        return {
+            "partidos": [],
+            "mas_afortunado": None,
+            "menos_afortunado": None,
+            "sin_xg": sin_xg,
+        }
+
+    # Un equipo por cada lado de cada partido: 20 candidatos por jornada.
+    candidatos = []
+    for p in partidos:
+        for lado in ("local", "visitante"):
+            candidatos.append({
+                "equipo": p[lado],
+                "partido": p["id"],
+                "marcador": p["marcador"],
+                "goles": p["goles"][lado],
+                "xg": p["xg"][lado],
+                "diferencia": p["diferencia"][lado],
+            })
+
+    mas = max(candidatos, key=lambda c: c["diferencia"])
+    menos = min(candidatos, key=lambda c: c["diferencia"])
+
+    return {
+        "partidos": partidos,
+        "mas_afortunado": mas,
+        "menos_afortunado": menos,
+        "sin_xg": sin_xg,
+    }
 
 
 # --- Auditoria -------------------------------------------------------
@@ -155,22 +230,28 @@ def generar(referencia: datetime | None = None, escribir: bool = True) -> dict:
     for p in prediccion["partidos"]:
         loc = _canonico(p["local"], jugados)
         vis = _canonico(p["visitante"], jugados)
-        marcador = (
-            _buscar_resultado(jugados, loc, vis, p["fecha"])
+        fila = (
+            _buscar_partido(jugados, loc, vis, p["fecha"])
             if loc and vis
             else None
         )
 
-        if marcador is None:
+        if fila is None:
             sin_resultado.append(f"{p['local']} - {p['visitante']}")
             continue
+
+        gl, gv = int(fila["goles_local"]), int(fila["goles_visitante"])
+        xl, xv = fila["xg_local"], fila["xg_visitante"]
 
         filas.append({
             "id": p["id"],
             "local": p["local"],
             "visitante": p["visitante"],
-            "marcador": f"{marcador[0]}-{marcador[1]}",
-            "real": resultado_a_indice(*marcador),
+            "marcador": f"{gl}-{gv}",
+            "goles": (gl, gv),
+            "xg_local": None if pd.isna(xl) else float(xl),
+            "xg_visitante": None if pd.isna(xv) else float(xv),
+            "real": resultado_a_indice(gl, gv),
             "ego": [
                 p["prob"]["local"] / 100,
                 p["prob"]["empate"] / 100,
@@ -217,6 +298,20 @@ def generar(referencia: datetime | None = None, escribir: bool = True) -> dict:
     mejor = min(filas, key=lambda f: _rps_de_uno(f["ego"], f["real"]))
     peor = max(filas, key=lambda f: _rps_de_uno(f["ego"], f["real"]))
 
+    rendimiento = _rendimiento(filas)
+
+    avisos = []
+    if sin_resultado:
+        avisos.append(
+            f"{len(sin_resultado)} partido(s) sin resultado, fuera de la "
+            f"auditoria: {', '.join(sin_resultado)}"
+        )
+    if rendimiento["sin_xg"]:
+        avisos.append(
+            f"{len(rendimiento['sin_xg'])} partido(s) sin xG, fuera del "
+            f"analisis de rendimiento: {', '.join(rendimiento['sin_xg'])}"
+        )
+
     documento = {
         "version_esquema": VERSION_ESQUEMA,
         "generado": datetime.now().astimezone().isoformat(),
@@ -251,17 +346,14 @@ def generar(referencia: datetime | None = None, escribir: bool = True) -> dict:
             "marcador": peor["marcador"],
             "dio": peor["dio"],
         },
-        "advertencias": (
-            [f"{len(sin_resultado)} partido(s) sin resultado, fuera de la "
-             f"auditoria: {', '.join(sin_resultado)}"]
-            if sin_resultado else []
-        ),
+        "rendimiento": rendimiento,
+        "advertencias": avisos,
     }
 
     if escribir:
         SALIDA.mkdir(parents=True, exist_ok=True)
-                # Si la prediccion era una simulacion, la auditoria tambien lo
-        # es: hereda la marca para que no acabe en el repo.
+        # Si la prediccion era una simulacion, la auditoria tambien lo
+        # es: hereda la marca para que no acabe en el repo (D-48).
         marca = "_SIM" if "_SIM" in ruta.name else ""
         nombre = (f"{temporada}_J{prediccion['jornada_etiqueta']:02d}"
                   f"{marca}_auditoria.json")
@@ -299,6 +391,15 @@ if __name__ == "__main__":
           f"{d['mejor']['dio']}")
     print(f"   Peor:  {d['peor']['partido']} {d['peor']['marcador']} "
           f"{d['peor']['dio']}")
+
+    r = d["rendimiento"]
+    if r["mas_afortunado"]:
+        m, n = r["mas_afortunado"], r["menos_afortunado"]
+        print(f"\n   RENDIMIENTO ({len(r['partidos'])} partidos con xG)")
+        print(f"   Mas afortunado:  {m['equipo']:<14} "
+              f"{m['goles']} goles con {m['xg']:.2f} de xG  ({m['diferencia']:+.2f})")
+        print(f"   Menos afortunado: {n['equipo']:<14} "
+              f"{n['goles']} goles con {n['xg']:.2f} de xG  ({n['diferencia']:+.2f})")
 
     for a in d["advertencias"]:
         print(f"\n   AVISO: {a}")

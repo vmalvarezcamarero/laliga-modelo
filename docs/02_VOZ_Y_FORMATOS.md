@@ -98,20 +98,26 @@ Esta voz es la que hace que la cuenta sea seguible. Sin ella, sería un bot arro
 
 ### F2 — EL DICTAMEN (jueves)
 
-**Imagen:** tabla de los 10 partidos con probabilidades 1X2.
+**Imagen:** tabla de los partidos con probabilidades 1X2.
 **Texto:** la predicción más atrevida de la jornada.
 
-> EGO le da un 44% al Espanyol en Mestalla. Es lo más agresivo que ha dictaminado en todo el año. El resto de la jornada, en la imagen.
+El ángulo es el conflicto entre la criba y la predicción: el equipo que EGO descarta y al que aun así le da opciones contra uno que sí pasa.
 
-### F3 — EL PUNTO CIEGO (jueves o viernes)
+> EGO le da un 44% al Espanyol en Mestalla. El Espanyol no pasa la criba. La criba descarta, el dictamen no entierra.
 
-El partido con mayor entropía. Donde EGO admite que no sabe.
+### F3 — EL PUNTO CIEGO (viernes)
+
+El partido con mayor incertidumbre. Donde EGO admite que no sabe.
+
+Es el formato más corto del proyecto, y eso es deliberado.
 
 > Getafe – Osasuna. 34% / 31% / 35%. Es lo más cerca que va a estar EGO de encogerse de hombros.
 
 ### F4 — EL DESAFÍO (viernes)
 
-Encuesta nativa de X. Sin revelar la predicción de EGO hasta el lunes.
+Encuesta nativa de X. **Sin revelar la predicción de EGO hasta el lunes.**
+
+El redactor no recibe las probabilidades: el público vota antes de saber qué dice el modelo, y la única forma de garantizarlo es no tener el dato delante.
 
 > Sevilla – Betis, domingo. Vota. El lunes comparamos tu criterio con el de EGO. Uno de los dos va a quedar retratado.
 
@@ -119,9 +125,15 @@ Encuesta nativa de X. Sin revelar la predicción de EGO hasta el lunes.
 
 **Imagen:** gráfico de RPS acumulado — EGO vs baseline vs público.
 
-Cuando pasa:
+Tiene tres registros según cómo haya ido la semana.
 
-> Jornada 7. EGO: 0.198. Modelo tonto: 0.221. Vosotros: 0.205. Pasa la criba. Por poco, y con una sonrisa que da rabia.
+Cuando pasa con margen:
+
+> Jornada 7. EGO: 0.198. Modelo tonto: 0.221. Pasa la criba. Por poco, y con una sonrisa que da rabia.
+
+Cuando pasa raspado (margen menor de 0.01):
+
+> Pasa. Por 0.004. Una victoria que no da para presumir, y EGO no presume.
 
 Cuando **no** pasa:
 
@@ -129,17 +141,30 @@ Cuando **no** pasa:
 
 Esta es la publicación más importante de la semana. **Se publica siempre.**
 
-### F6 — RUIDO (miércoles, rotatorio)
+**El listón está medido:** sobre 152 jornadas de cuatro temporadas, EGO no pasa su criba en 28 y gana raspado en otras 10. Casi la mitad de los lunes no son una victoria cómoda.
 
-Una pregunta absurda calculada en serio. EGO la considera irrelevante y la calcula igualmente, con desprecio.
+### F6 — LO QUE DICEN LOS GOLES Y LO QUE DICE EL XG (miércoles)
 
-> Probabilidad de que el Rayo – Alavés tenga más córners que tiros a puerta: 23%. EGO lo califica de ruido. Se lo hemos preguntado igual.
+Análisis retrospectivo de la jornada. Quién ganó sin merecerlo y quién mereció más de lo que sacó.
 
-### F7 — EL RELATO (rotatorio)
+**Imagen:** goles reales contra xG generado, por equipo y partido.
+**Voz:** EGO. Es el mismo personaje frío aplicado al pasado. No celebra ni lamenta: constata que un equipo marcó más de lo que generó.
 
-Donde EGO discrepa de la prensa.
+Este formato es la tesis de la cuenta mirando hacia atrás: los resultados no dicen quién jugó mejor, y por eso la criba no los mira.
 
-> Todas las previas dan al Atleti favorito claro. EGO le da un 41%. Uno de los dos está leyendo mal la temporada.
+> El Barcelona marcó 5 con 2.96 de xG, las ocasiones que creó. Cuatro días después marcó 2 con 3.92. El mismo equipo, dos semanas distintas. Los goles son ruidosos. EGO mira otra cosa.
+
+**Puede ocurrir que el mismo equipo sea el más y el menos afortunado** de la ventana, con dos partidos distintos. No es un error: es la mejor demostración de que el marcador y el rendimiento son cosas distintas. Cuando pase, ese es el post.
+
+**No se juzga a nadie por tener suerte.** EGO no dice que un equipo sea malo por marcar de más. Dice que marcó de más, que es un hecho.
+
+### F7 — EGO CONTRA EL PÚBLICO (rotatorio)
+
+Donde se compara el criterio del público con el de EGO, a partir de la encuesta del viernes.
+
+No existe hasta que haya encuestas cerradas.
+
+> Votasteis Sevilla. EGO decía Betis. Ganó el Betis. Esta semana el modelo os gana. La semana que viene ya veremos.
 
 ---
 
@@ -148,11 +173,13 @@ Donde EGO discrepa de la prensa.
 | Día | Formato | Tipo |
 |---|---|---|
 | Lunes | F5 — EGO pasa la criba | Fijo |
-| Miércoles | F6 o F7 | Rotatorio |
-| Jueves | F1 + F2 (o F3) | Fijo |
-| Viernes | F4 — El desafío | Fijo |
+| Miércoles | F6 — Goles contra xG | Fijo |
+| Jueves | F1 + F2 | Fijo |
+| Viernes | F3 + F4 | Fijo |
 
-**4 publicaciones semanales. No más.** La consistencia importa más que el volumen, y el sistema tiene que aguantar meses.
+**Al publicar el jueves, F1 va primero y F2 después.** La criba establece el marco y el dictamen se apoya en él: un F2 solo pierde el sentido de "el que no pasa tiene opciones".
+
+La consistencia importa más que el volumen, y el sistema tiene que aguantar meses.
 
 ---
 
@@ -161,11 +188,14 @@ Donde EGO discrepa de la prensa.
 La API recibe en cada llamada:
 
 1. Esta guía (como Skill)
-2. Los números del pipeline en JSON
-3. Los 10 posts propios con mejor rendimiento reciente
-4. El formato objetivo (F1–F7)
+2. **Solo la parcela del JSON que ese formato necesita**
+3. El formato objetivo
 
-Devuelve **8 borradores rankeados**. El humano elige uno en Telegram.
+Devuelve **5 borradores rankeados**. El humano elige uno en Telegram.
+
+**Cada formato ve solo lo suyo.** Un F1 recibe la criba y nada más; un F5, el veredicto y nada de la semana que viene; un F4, el partido de la encuesta sin las probabilidades. La forma más fiable de que un modelo no hable de algo es que no lo tenga delante.
+
+**Los números del borrador se verifican contra el JSON.** Las cifras que no aparezcan en los datos se marcan con un aviso. No se descartan automáticamente: "7 de 20 equipos" es legítimo aunque el 20 no sea un campo.
 
 Nunca se publica un borrador sin leerlo. Cuesta 20 segundos y evita el 100% de los desastres.
 
@@ -175,10 +205,14 @@ Nunca se publica un borrador sin leerlo. Cuesta 20 segundos y evita el 100% de l
 
 Cada lunes el sistema anota en SQLite qué formatos y qué aperturas de frase han rendido mejor, a partir de las analíticas exportadas de X. Esos datos entran en la siguiente generación.
 
+**No existe hasta que haya posts publicados con analíticas.**
+
 El aprendizaje es sobre **estructura del post**, nunca sobre el modelo estadístico. Son dos bucles distintos y mezclarlos corrompería las predicciones.
 
 ---
 
 ## Nota de correspondencia con otros documentos
 
-`01_ARQUITECTURA.md` §3.1 cita "formato D5 (el punto ciego)". Se refiere al diferenciador **D5** de `00_PROYECTO.md` §6, que aquí se materializa como formato **F3**. Los diferenciadores usan la letra D; los formatos, la F.
+`01_ARQUITECTURA.md` cita el diferenciador **D5** de `00_PROYECTO.md` §6, que aquí se materializa como formato **F3**. Los diferenciadores usan la letra D; los formatos, la F.
+
+**F6 cambió de contenido en el Sprint 4.** Antes era "ruido": una métrica absurda calculada en serio. Nunca llegó a concretarse y el análisis retrospectivo de goles contra xG ocupa mejor ese hueco: usa datos reales, refuerza la tesis y tiene material cada semana.
