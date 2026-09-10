@@ -1,30 +1,37 @@
 """
 Grafico del formato F2 — EL DICTAMEN.
 
-Los diez partidos de la jornada con sus probabilidades 1X2. Es la imagen
-del jueves que acompana a F1 (02_VOZ_Y_FORMATOS §5).
+Los partidos de la jornada con sus probabilidades 1X2. Es la imagen del
+jueves que acompana a F1 (02_VOZ_Y_FORMATOS §5).
+
+DE DONDE SALEN LOS NUMEROS (D-47)
+---------------------------------
+Del JSON de la semana. Ningun grafico publicable recalcula.
+
+La version anterior ajustaba el modelo por su cuenta con una temporada
+y jornada fijas en `main()`: generaba la J38 de 2025-26 mientras el
+texto hablaba de la J5 de 2026-27. Ademas elegia la prediccion
+"atrevida" con un criterio propio (la mayor probabilidad al visitante)
+que NO es el del JSON, asi que el ambar marcaba un partido y el tuit
+hablaba de otro.
+
+El gancho `F2_atrevida` lo elige el pipeline: el equipo que NO pasa la
+criba con mas probabilidad de ganar a uno que SI. Ese es el criterio, y
+el grafico lo copia.
 
 Decisiones de diseno
 --------------------
 1. Barras apiladas, no tabla de numeros. Treinta porcentajes en una
    tabla no se leen en un movil. Una barra partida en tres deja ver de
-   un vistazo si un partido esta decidido o abierto, y el numero va
-   dentro para quien quiera el detalle.
+   un vistazo si un partido esta decidido o abierto.
 
 2. Tres grises, no tres colores. Claro = gana el local, medio = empate,
-   oscuro = gana el visitante. Siempre en ese orden y siempre igual: en
-   cuanto alguien lo vea dos jueves seguidos deja de necesitar la
-   leyenda. Nada de verde y rojo, que es estetica de casa de apuestas
-   (00_PROYECTO.md §8).
+   oscuro = gana el visitante. Siempre igual: en cuanto alguien lo vea
+   dos jueves seguidos deja de necesitar la leyenda. Nada de verde y
+   rojo, que es estetica de casa de apuestas (00_PROYECTO.md §8).
 
 3. El ambar marca la prediccion mas atrevida, que es la que comenta el
-   texto del tuit. Un solo acento por grafico, y sigue significando lo
-   mismo que en F1 y F5: aqui es donde hay que mirar.
-
-   "Atrevida" se define como la mayor probabilidad concedida a un
-   visitante. En futbol, apostar por el que juega fuera es la
-   afirmacion arriesgada por defecto. Es una heuristica: se puede
-   forzar otra fila con el parametro 'destacar'.
+   texto del tuit. Un solo acento por grafico.
 
 4. Los porcentajes se escriben dentro de su segmento solo si cabe. Un
    numero encima de otro es peor que un numero ausente; el que falta se
@@ -34,18 +41,19 @@ Uso:
     python -m src.content.grafico_dictamen
 """
 
-import sqlite3
+import json
+import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 from src.content import estilo
-from src.models import dixon_coles
-from src.models.criba import XI, asignar_jornadas
 
 RAIZ = Path(__file__).resolve().parents[2]
-BD = RAIZ / "data" / "laliga.db"
+PREDICCIONES = RAIZ / "outputs" / "predictions"
 
 # Ancho minimo de segmento para que quepa el porcentaje dentro.
 MINIMO_PARA_ESCRIBIR = 0.12
@@ -53,6 +61,55 @@ MINIMO_PARA_ESCRIBIR = 0.12
 COLOR_LOCAL = estilo.TEXTO
 COLOR_EMPATE = "#4A5058"
 COLOR_VISITANTE = "#8B939C"
+
+
+def desde_json(ruta: Path | None = None) -> tuple[pd.DataFrame, int | None, dict]:
+    """
+    Lee los partidos del JSON de la semana.
+
+    Devuelve tambien el indice de la fila que hay que destacar, que es
+    la del gancho `F2_atrevida`: la eleccion editorial la hace el
+    pipeline, no el grafico.
+    """
+    if ruta is None:
+        candidatos = sorted(
+            p for p in PREDICCIONES.glob("*_prediccion.json")
+            if "_SIM" not in p.name
+        )
+        if not candidatos:
+            raise SystemExit(
+                f"No hay ningun *_prediccion.json en {PREDICCIONES}.\n"
+                f"Ejecuta antes: python -m src.content.jornada_json"
+            )
+        ruta = candidatos[-1]
+
+    doc = json.loads(ruta.read_text(encoding="utf-8"))
+
+    filas = [
+        {
+            "id": p["id"],
+            "local": p["local"],
+            "visitante": p["visitante"],
+            "p_local": p["prob"]["local"] / 100,
+            "p_empate": p["prob"]["empate"] / 100,
+            "p_visitante": p["prob"]["visitante"] / 100,
+            "entropia": p["entropia"],
+        }
+        for p in doc["partidos"]
+    ]
+
+    # De mas decidido a mas abierto: la barra mas partida abajo. Da al
+    # grafico una diagonal que se lee sola.
+    df = pd.DataFrame(filas).sort_values("entropia").reset_index(drop=True)
+
+    destacar = None
+    gancho = doc["ganchos"].get("F2_atrevida")
+    if gancho:
+        coincide = df.index[df["id"] == gancho["partido"]]
+        if len(coincide):
+            destacar = int(coincide[0])
+
+    return df, destacar, doc
 
 
 def dibujar(
@@ -63,12 +120,9 @@ def dibujar(
     """
     partidos: DataFrame con columnas local, visitante, p_local,
               p_empate, p_visitante. Una fila por partido.
-    destacar: indice de la fila a marcar en ambar. Si es None, se elige
-              la de mayor probabilidad de victoria visitante.
+    destacar: indice de la fila a marcar en ambar. Viene del gancho
+              F2_atrevida del JSON.
     """
-    if destacar is None:
-        destacar = int(partidos["p_visitante"].idxmax())
-
     fig, ax = plt.subplots(figsize=(estilo.ANCHO_PULGADAS, estilo.ALTO_PULGADAS))
     fig.subplots_adjust(left=0.28, right=0.95, top=0.80, bottom=0.14)
 
@@ -77,7 +131,6 @@ def dibujar(
     for i, (_, partido) in enumerate(partidos.iterrows()):
         valores = [partido["p_local"], partido["p_empate"], partido["p_visitante"]]
         colores = [COLOR_LOCAL, COLOR_EMPATE, COLOR_VISITANTE]
-        es_destacada = i == destacar
 
         izquierda = 0.0
         for valor, color in zip(valores, colores):
@@ -97,8 +150,6 @@ def dibujar(
                 )
             izquierda += valor
 
-        
-
     etiquetas = [
         f"{fila['local']} - {fila['visitante']}"
         for _, fila in partidos.iterrows()
@@ -107,9 +158,8 @@ def dibujar(
     ax.set_yticklabels(etiquetas, fontsize=14)
     ax.invert_yaxis()
 
-    for i, etiqueta in enumerate(ax.get_yticklabels()):
-        if i == destacar:
-            etiqueta.set_color(estilo.AMBAR)
+    if destacar is not None:
+        ax.get_yticklabels()[destacar].set_color(estilo.AMBAR)
 
     ax.set_xlim(0, 1)
     ax.set_xticks([])
@@ -131,80 +181,41 @@ def dibujar(
     return fig
 
 
-def _dictamen_de_una_jornada(temporada: str, jornada: int) -> pd.DataFrame:
-    """Ajusta con datos anteriores a la jornada y predice sus partidos."""
-    con = sqlite3.connect(BD)
-    todos = pd.read_sql("SELECT * FROM matches", con, parse_dates=["fecha"])
-    con.close()
-    todos = todos.sort_values("fecha").reset_index(drop=True)
-
-    de_la_temporada = asignar_jornadas(todos[todos["temporada"] == temporada])
-    bloque = de_la_temporada[de_la_temporada["jornada"] == jornada]
-    if bloque.empty:
-        raise SystemExit(f"No hay jornada {jornada} en {temporada}.")
-
-    corte = bloque["fecha"].min()
-    # Frontera temporal estricta, igual que en todo el proyecto.
-    entrenamiento = todos[todos["fecha"] < corte]
-
-    parametros = dixon_coles.ajustar(entrenamiento, xi=XI, referencia=corte)
-
-    filas = []
-    for _, partido in bloque.iterrows():
-        local, visitante = partido["local"], partido["visitante"]
-
-        # Recien ascendidos sin historico: no se predicen a ciegas.
-        if local not in parametros.equipos or visitante not in parametros.equipos:
-            print(f"  aviso: {local} - {visitante} sin datos suficientes, fuera")
-            continue
-
-        matriz = dixon_coles.matriz_marcadores(parametros, local, visitante)
-        p_local, p_empate, p_visitante = dixon_coles.probabilidades_1x2(matriz)
-
-        filas.append(
-            {
-                "local": local,
-                "visitante": visitante,
-                "p_local": p_local,
-                "p_empate": p_empate,
-                "p_visitante": p_visitante,
-                "entropia": dixon_coles.entropia(matriz),
-            }
-        )
-
-    # De mas decidido a mas abierto: la barra mas partida abajo. Da al
-    # grafico una diagonal que se lee sola.
-    return (
-        pd.DataFrame(filas)
-        .sort_values("entropia")
-        .reset_index(drop=True)
-    )
-
-
 def main() -> None:
     estilo.aplicar()
 
-    temporada, jornada = "2025-26", 38
-    partidos = _dictamen_de_una_jornada(temporada, jornada)
+    partidos, destacar, doc = desde_json()
 
-    fig = dibujar(partidos, f"Jornada {jornada}  ·  {temporada}")
-    destino = estilo.guardar(fig, f"dictamen_{temporada}_j{jornada}.png")
+    temporada = doc["temporada"]
+    jornada = doc["jornada_etiqueta"]
+
+    subtitulo = f"Jornada {jornada}  ·  {temporada}"
+    if doc.get("semana_mezclada"):
+        subtitulo += "  ·  semana mezclada"
+
+    fig = dibujar(partidos, subtitulo, destacar=destacar)
+    destino = estilo.guardar(fig, f"dictamen_{temporada}_j{jornada:02d}.png")
     plt.close(fig)
 
-    atrevida = partidos.loc[partidos["p_visitante"].idxmax()]
-    ciego = partidos.loc[partidos["entropia"].idxmax()]
+    print(f"Jornada {jornada} de {temporada}  ({len(partidos)} partidos)")
+
+    gancho = doc["ganchos"].get("F2_atrevida")
+    if gancho:
+        print(f"\n   Mas atrevida: {gancho['equipo']} con {gancho['cifra']}%")
+        print(f"   Motivo: {gancho['motivo']}")
+
+    ciego = doc["ganchos"].get("F3_punto_ciego")
+    if ciego:
+        p = next(x for x in doc["partidos"] if x["id"] == ciego["partido"])
+        print(f"\n   Punto ciego (F3): {p['local']} - {p['visitante']}, "
+              f"{p['prob']['local']}% / {p['prob']['empate']}% / "
+              f"{p['prob']['visitante']}%")
+
+    for a in doc["advertencias"]:
+        print(f"\n   AVISO: {a}")
 
     print(f"\nGuardado en {destino}")
-    print(
-        f"Mas atrevida: {atrevida['local']} - {atrevida['visitante']}, "
-        f"{atrevida['p_visitante'] * 100:.0f}% al visitante"
-    )
-    print(
-        f"Punto ciego (F3): {ciego['local']} - {ciego['visitante']}, "
-        f"{ciego['p_local'] * 100:.0f}% / {ciego['p_empate'] * 100:.0f}% / "
-        f"{ciego['p_visitante'] * 100:.0f}%"
-    )
 
 
 if __name__ == "__main__":
-    main()
+        main()
