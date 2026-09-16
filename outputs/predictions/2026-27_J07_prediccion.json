@@ -1,0 +1,715 @@
+{
+  "version_esquema": 1,
+  "generado": "2026-09-16T13:16:48.856695+00:00",
+  "temporada": "2026-27",
+  "jornada_etiqueta": 7,
+  "semana_mezclada": true,
+  "ventana": {
+    "desde": "2026-09-16T09:00:00+02:00",
+    "hasta": "2026-09-23T09:00:00+02:00"
+  },
+  "entrenamiento": {
+    "hasta": "2026-09-16",
+    "partidos": 4590
+  },
+  "criba": {
+    "umbral": 1.2,
+    "pasan": [
+      {
+        "equipo": "Barcelona",
+        "fuerza": 2.29,
+        "distancia": 1.09,
+        "estado": "sigue_dentro",
+        "partidos": 459
+      },
+      {
+        "equipo": "Real Madrid",
+        "fuerza": 2.08,
+        "distancia": 0.88,
+        "estado": "sigue_dentro",
+        "partidos": 459
+      },
+      {
+        "equipo": "Atlético",
+        "fuerza": 1.66,
+        "distancia": 0.46,
+        "estado": "sigue_dentro",
+        "partidos": 459
+      },
+      {
+        "equipo": "Villarreal",
+        "fuerza": 1.43,
+        "distancia": 0.23,
+        "estado": "sigue_dentro",
+        "partidos": 459
+      },
+      {
+        "equipo": "Athletic",
+        "fuerza": 1.43,
+        "distancia": 0.23,
+        "estado": "sigue_dentro",
+        "partidos": 459
+      },
+      {
+        "equipo": "Betis",
+        "fuerza": 1.25,
+        "distancia": 0.05,
+        "estado": "sigue_dentro",
+        "partidos": 421
+      },
+      {
+        "equipo": "Real Sociedad",
+        "fuerza": 1.25,
+        "distancia": 0.05,
+        "estado": "sigue_dentro",
+        "partidos": 459
+      }
+    ],
+    "no_pasan": [
+      {
+        "equipo": "Celta",
+        "fuerza": 1.09,
+        "distancia": -0.11,
+        "estado": "sigue_fuera",
+        "partidos": 459
+      },
+      {
+        "equipo": "Rayo",
+        "fuerza": 1.08,
+        "distancia": -0.12,
+        "estado": "sigue_fuera",
+        "partidos": 307
+      },
+      {
+        "equipo": "Alavés",
+        "fuerza": 1.07,
+        "distancia": -0.13,
+        "estado": "sigue_fuera",
+        "partidos": 345
+      },
+      {
+        "equipo": "Valencia",
+        "fuerza": 1.05,
+        "distancia": -0.15,
+        "estado": "sigue_fuera",
+        "partidos": 459
+      },
+      {
+        "equipo": "Osasuna",
+        "fuerza": 1.03,
+        "distancia": -0.17,
+        "estado": "sigue_fuera",
+        "partidos": 307
+      },
+      {
+        "equipo": "Sevilla",
+        "fuerza": 1.02,
+        "distancia": -0.18,
+        "estado": "sigue_fuera",
+        "partidos": 459
+      },
+      {
+        "equipo": "Levante",
+        "fuerza": 1.01,
+        "distancia": -0.19,
+        "estado": "sigue_fuera",
+        "partidos": 307
+      },
+      {
+        "equipo": "Getafe",
+        "fuerza": 0.92,
+        "distancia": -0.28,
+        "estado": "sigue_fuera",
+        "partidos": 421
+      },
+      {
+        "equipo": "Espanyol",
+        "fuerza": 0.89,
+        "distancia": -0.31,
+        "estado": "sigue_fuera",
+        "partidos": 383
+      },
+      {
+        "equipo": "Málaga",
+        "fuerza": 0.78,
+        "distancia": -0.42,
+        "estado": "sigue_fuera",
+        "partidos": 155
+      },
+      {
+        "equipo": "Dépor",
+        "fuerza": 0.77,
+        "distancia": -0.43,
+        "estado": "sigue_fuera",
+        "partidos": 155
+      },
+      {
+        "equipo": "Elche",
+        "fuerza": 0.77,
+        "distancia": -0.43,
+        "estado": "sigue_fuera",
+        "partidos": 193
+      }
+    ],
+    "sin_datos": [
+      {
+        "equipo": "Racing",
+        "partidos": 3
+      }
+    ],
+    "resumen": {
+      "n_pasan": 7,
+      "entran": [],
+      "salen": [],
+      "primera_criba": false
+    }
+  },
+  "partidos": [
+    {
+      "id": "J6_LaCoruna_Sevilla",
+      "jornada": 6,
+      "local": "Dépor",
+      "visitante": "Sevilla",
+      "fecha": "2026-09-16T19:00:00+02:00",
+      "prob": {
+        "local": 36,
+        "empate": 28,
+        "visitante": 36
+      },
+      "marcador_probable": "1-1",
+      "entropia": 1.575,
+      "mas_25_goles": 42,
+      "ambos_marcan": 48,
+      "criba": {
+        "local": false,
+        "visitante": false,
+        "choque_directo": false
+      },
+      "fiabilidad": "completa",
+      "corners": {
+        "local": 4.7,
+        "visitante": 5.1
+      },
+      "tarjetas": {
+        "local": 2.5,
+        "visitante": 2.3
+      }
+    },
+    {
+      "id": "J6_AthMadrid_Osasuna",
+      "jornada": 6,
+      "local": "Atlético",
+      "visitante": "Osasuna",
+      "fecha": "2026-09-16T19:00:00+02:00",
+      "prob": {
+        "local": 62,
+        "empate": 21,
+        "visitante": 17
+      },
+      "marcador_probable": "1-0",
+      "entropia": 1.336,
+      "mas_25_goles": 54,
+      "ambos_marcan": 51,
+      "criba": {
+        "local": true,
+        "visitante": false,
+        "choque_directo": true
+      },
+      "fiabilidad": "completa",
+      "corners": {
+        "local": 6.0,
+        "visitante": 3.4
+      },
+      "tarjetas": {
+        "local": 2.0,
+        "visitante": 2.1
+      }
+    },
+    {
+      "id": "J6_Levante_AthBilbao",
+      "jornada": 6,
+      "local": "Levante",
+      "visitante": "Athletic",
+      "fecha": "2026-09-16T21:30:00+02:00",
+      "prob": {
+        "local": 36,
+        "empate": 25,
+        "visitante": 39
+      },
+      "marcador_probable": "1-1",
+      "entropia": 1.559,
+      "mas_25_goles": 55,
+      "ambos_marcan": 58,
+      "criba": {
+        "local": false,
+        "visitante": true,
+        "choque_directo": true
+      },
+      "fiabilidad": "completa",
+      "corners": {
+        "local": 4.4,
+        "visitante": 5.6
+      },
+      "tarjetas": {
+        "local": 2.0,
+        "visitante": 2.2
+      }
+    },
+    {
+      "id": "J6_Barcelona_Santander",
+      "jornada": 6,
+      "local": "Barcelona",
+      "visitante": "Racing",
+      "fecha": "2026-09-16T21:30:00+02:00",
+      "prob": {
+        "local": 73,
+        "empate": 16,
+        "visitante": 12
+      },
+      "marcador_probable": "2-0",
+      "entropia": 1.116,
+      "mas_25_goles": 70,
+      "ambos_marcan": 58,
+      "criba": {
+        "local": true,
+        "visitante": false,
+        "choque_directo": true
+      },
+      "fiabilidad": "parcial",
+      "corners": {
+        "local": 9.7,
+        "visitante": 3.5
+      },
+      "tarjetas": {
+        "local": 1.6,
+        "visitante": 2.4
+      }
+    },
+    {
+      "id": "J6_Betis_Getafe",
+      "jornada": 6,
+      "local": "Betis",
+      "visitante": "Getafe",
+      "fecha": "2026-09-17T19:00:00+02:00",
+      "prob": {
+        "local": 54,
+        "empate": 26,
+        "visitante": 21
+      },
+      "marcador_probable": "1-0",
+      "entropia": 1.452,
+      "mas_25_goles": 43,
+      "ambos_marcan": 45,
+      "criba": {
+        "local": true,
+        "visitante": false,
+        "choque_directo": true
+      },
+      "fiabilidad": "completa",
+      "corners": {
+        "local": 5.0,
+        "visitante": 3.6
+      },
+      "tarjetas": {
+        "local": 2.3,
+        "visitante": 3.4
+      }
+    },
+    {
+      "id": "J6_Malaga_Villarreal",
+      "jornada": 6,
+      "local": "Málaga",
+      "visitante": "Villarreal",
+      "fecha": "2026-09-17T21:30:00+02:00",
+      "prob": {
+        "local": 28,
+        "empate": 25,
+        "visitante": 47
+      },
+      "marcador_probable": "1-1",
+      "entropia": 1.527,
+      "mas_25_goles": 51,
+      "ambos_marcan": 54,
+      "criba": {
+        "local": false,
+        "visitante": true,
+        "choque_directo": true
+      },
+      "fiabilidad": "completa",
+      "corners": {
+        "local": 5.6,
+        "visitante": 4.3
+      },
+      "tarjetas": {
+        "local": 2.4,
+        "visitante": 2.5
+      }
+    },
+    {
+      "id": "J7_Espanol_Elche",
+      "jornada": 7,
+      "local": "Espanyol",
+      "visitante": "Elche",
+      "fecha": "2026-09-18T21:00:00+02:00",
+      "prob": {
+        "local": 52,
+        "empate": 24,
+        "visitante": 24
+      },
+      "marcador_probable": "1-1",
+      "entropia": 1.48,
+      "mas_25_goles": 54,
+      "ambos_marcan": 55,
+      "criba": {
+        "local": false,
+        "visitante": false,
+        "choque_directo": false
+      },
+      "fiabilidad": "completa",
+      "corners": {
+        "local": 4.8,
+        "visitante": 4.1
+      },
+      "tarjetas": {
+        "local": 2.2,
+        "visitante": 2.5
+      }
+    },
+    {
+      "id": "J7_Osasuna_Vallecano",
+      "jornada": 7,
+      "local": "Osasuna",
+      "visitante": "Rayo",
+      "fecha": "2026-09-19T14:00:00+02:00",
+      "prob": {
+        "local": 45,
+        "empate": 26,
+        "visitante": 29
+      },
+      "marcador_probable": "1-1",
+      "entropia": 1.544,
+      "mas_25_goles": 48,
+      "ambos_marcan": 52,
+      "criba": {
+        "local": false,
+        "visitante": false,
+        "choque_directo": false
+      },
+      "fiabilidad": "completa",
+      "corners": {
+        "local": 5.0,
+        "visitante": 4.6
+      },
+      "tarjetas": {
+        "local": 2.2,
+        "visitante": 2.6
+      }
+    },
+    {
+      "id": "J7_AthBilbao_Alaves",
+      "jornada": 7,
+      "local": "Athletic",
+      "visitante": "Alavés",
+      "fecha": "2026-09-19T16:15:00+02:00",
+      "prob": {
+        "local": 54,
+        "empate": 25,
+        "visitante": 21
+      },
+      "marcador_probable": "1-0",
+      "entropia": 1.448,
+      "mas_25_goles": 47,
+      "ambos_marcan": 48,
+      "criba": {
+        "local": true,
+        "visitante": false,
+        "choque_directo": true
+      },
+      "fiabilidad": "completa",
+      "corners": {
+        "local": 6.7,
+        "visitante": 3.6
+      },
+      "tarjetas": {
+        "local": 2.0,
+        "visitante": 2.6
+      }
+    },
+    {
+      "id": "J7_Celta_Santander",
+      "jornada": 7,
+      "local": "Celta",
+      "visitante": "Racing",
+      "fecha": "2026-09-19T18:30:00+02:00",
+      "prob": {
+        "local": 45,
+        "empate": 26,
+        "visitante": 30
+      },
+      "marcador_probable": "1-1",
+      "entropia": 1.543,
+      "mas_25_goles": 50,
+      "ambos_marcan": 54,
+      "criba": {
+        "local": false,
+        "visitante": false,
+        "choque_directo": false
+      },
+      "fiabilidad": "parcial",
+      "corners": {
+        "local": 6.3,
+        "visitante": 4.0
+      },
+      "tarjetas": {
+        "local": 1.8,
+        "visitante": 2.5
+      }
+    },
+    {
+      "id": "J7_Sevilla_Barcelona",
+      "jornada": 7,
+      "local": "Sevilla",
+      "visitante": "Barcelona",
+      "fecha": "2026-09-19T21:00:00+02:00",
+      "prob": {
+        "local": 23,
+        "empate": 22,
+        "visitante": 56
+      },
+      "marcador_probable": "1-2",
+      "entropia": 1.43,
+      "mas_25_goles": 62,
+      "ambos_marcan": 61,
+      "criba": {
+        "local": false,
+        "visitante": true,
+        "choque_directo": true
+      },
+      "fiabilidad": "completa",
+      "corners": {
+        "local": 4.5,
+        "visitante": 5.3
+      },
+      "tarjetas": {
+        "local": 2.6,
+        "visitante": 2.0
+      }
+    },
+    {
+      "id": "J7_Getafe_Malaga",
+      "jornada": 7,
+      "local": "Getafe",
+      "visitante": "Málaga",
+      "fecha": "2026-09-20T14:00:00+02:00",
+      "prob": {
+        "local": 47,
+        "empate": 29,
+        "visitante": 23
+      },
+      "marcador_probable": "1-0",
+      "entropia": 1.521,
+      "mas_25_goles": 33,
+      "ambos_marcan": 39,
+      "criba": {
+        "local": false,
+        "visitante": false,
+        "choque_directo": false
+      },
+      "fiabilidad": "completa",
+      "corners": {
+        "local": 4.6,
+        "visitante": 3.8
+      },
+      "tarjetas": {
+        "local": 3.0,
+        "visitante": 3.0
+      }
+    },
+    {
+      "id": "J7_AthMadrid_RealMadrid",
+      "jornada": 7,
+      "local": "Atlético",
+      "visitante": "Real Madrid",
+      "fecha": "2026-09-20T16:15:00+02:00",
+      "prob": {
+        "local": 40,
+        "empate": 24,
+        "visitante": 36
+      },
+      "marcador_probable": "1-1",
+      "entropia": 1.551,
+      "mas_25_goles": 61,
+      "ambos_marcan": 63,
+      "criba": {
+        "local": true,
+        "visitante": true,
+        "choque_directo": false
+      },
+      "fiabilidad": "completa",
+      "corners": {
+        "local": 5.0,
+        "visitante": 4.9
+      },
+      "tarjetas": {
+        "local": 2.2,
+        "visitante": 1.7
+      }
+    },
+    {
+      "id": "J7_LaCoruna_Betis",
+      "jornada": 7,
+      "local": "Dépor",
+      "visitante": "Betis",
+      "fecha": "2026-09-20T18:30:00+02:00",
+      "prob": {
+        "local": 31,
+        "empate": 27,
+        "visitante": 42
+      },
+      "marcador_probable": "1-1",
+      "entropia": 1.558,
+      "mas_25_goles": 46,
+      "ambos_marcan": 51,
+      "criba": {
+        "local": false,
+        "visitante": true,
+        "choque_directo": true
+      },
+      "fiabilidad": "completa",
+      "corners": {
+        "local": 5.3,
+        "visitante": 5.2
+      },
+      "tarjetas": {
+        "local": 2.6,
+        "visitante": 1.7
+      }
+    },
+    {
+      "id": "J7_Villarreal_Levante",
+      "jornada": 7,
+      "local": "Villarreal",
+      "visitante": "Levante",
+      "fecha": "2026-09-20T18:30:00+02:00",
+      "prob": {
+        "local": 63,
+        "empate": 19,
+        "visitante": 19
+      },
+      "marcador_probable": "2-1",
+      "entropia": 1.324,
+      "mas_25_goles": 71,
+      "ambos_marcan": 65,
+      "criba": {
+        "local": true,
+        "visitante": false,
+        "choque_directo": true
+      },
+      "fiabilidad": "completa",
+      "corners": {
+        "local": 6.0,
+        "visitante": 4.1
+      },
+      "tarjetas": {
+        "local": 2.3,
+        "visitante": 2.4
+      }
+    },
+    {
+      "id": "J7_Valencia_Sociedad",
+      "jornada": 7,
+      "local": "Valencia",
+      "visitante": "Real Sociedad",
+      "fecha": "2026-09-20T21:00:00+02:00",
+      "prob": {
+        "local": 41,
+        "empate": 26,
+        "visitante": 33
+      },
+      "marcador_probable": "1-1",
+      "entropia": 1.562,
+      "mas_25_goles": 48,
+      "ambos_marcan": 53,
+      "criba": {
+        "local": false,
+        "visitante": true,
+        "choque_directo": true
+      },
+      "fiabilidad": "completa",
+      "corners": {
+        "local": 4.8,
+        "visitante": 4.7
+      },
+      "tarjetas": {
+        "local": 2.2,
+        "visitante": 2.6
+      }
+    }
+  ],
+  "ganchos": {
+    "F1_descarte": {
+      "equipo": "Celta",
+      "cifra": -0.11,
+      "motivo": "mas_cerca_del_corte",
+      "apretados": [
+        {
+          "equipo": "Athletic",
+          "fuerza": 1.43,
+          "distancia_al_umbral": 0.23,
+          "pasa": true
+        },
+        {
+          "equipo": "Betis",
+          "fuerza": 1.25,
+          "distancia_al_umbral": 0.05,
+          "pasa": true,
+          "distancia_al_anterior": 0.18
+        },
+        {
+          "equipo": "Real Sociedad",
+          "fuerza": 1.25,
+          "distancia_al_umbral": 0.05,
+          "pasa": true,
+          "distancia_al_anterior": 0.0
+        },
+        {
+          "equipo": "Celta",
+          "fuerza": 1.09,
+          "distancia_al_umbral": -0.11,
+          "pasa": false,
+          "distancia_al_anterior": 0.16
+        },
+        {
+          "equipo": "Rayo",
+          "fuerza": 1.08,
+          "distancia_al_umbral": -0.12,
+          "pasa": false,
+          "distancia_al_anterior": 0.01
+        },
+        {
+          "equipo": "Alavés",
+          "fuerza": 1.07,
+          "distancia_al_umbral": -0.13,
+          "pasa": false,
+          "distancia_al_anterior": 0.01
+        }
+      ]
+    },
+    "F2_atrevida": {
+      "partido": "J7_Valencia_Sociedad",
+      "equipo": "Valencia",
+      "cifra": 41,
+      "motivo": "descartado_con_opciones"
+    },
+    "F3_punto_ciego": {
+      "partido": "J6_LaCoruna_Sevilla",
+      "cifra": 1.575
+    },
+    "F4_encuesta": {
+      "partido": "J6_Levante_AthBilbao"
+    }
+  },
+  "advertencias": [
+    "Semana con partidos de varias jornadas (J6: 6, J7: 10)."
+  ]
+}
